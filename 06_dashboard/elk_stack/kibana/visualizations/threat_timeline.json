@@ -1,0 +1,177 @@
+{
+  "attributes": {
+    "title": "Threat Event Timeline",
+    "description": "Time-series visualization of security events over time, grouped by severity level and event category. Provides a chronological view of attack progression.",
+    "visState": {
+      "title": "Threat Event Timeline",
+      "type": "line",
+      "params": {
+        "type": "line",
+        "grid": {
+          "categoryLines": true,
+          "style": { "color": "#1a1a2e" },
+          "valueAxis": "ValueAxis-1"
+        },
+        "categoryAxes": [
+          {
+            "id": "CategoryAxis-1",
+            "type": "category",
+            "position": "bottom",
+            "show": true,
+            "style": {},
+            "scale": { "type": "linear" },
+            "labels": {
+              "show": true,
+              "truncate": 100,
+              "filter": true
+            },
+            "title": { "text": "Time" }
+          }
+        ],
+        "valueAxes": [
+          {
+            "id": "ValueAxis-1",
+            "name": "Event Count",
+            "type": "value",
+            "position": "left",
+            "show": true,
+            "style": {},
+            "scale": { "type": "linear", "mode": "normal" },
+            "labels": { "show": true, "rotate": 0, "filter": false, "truncate": 100 },
+            "title": { "text": "Event Count" }
+          }
+        ],
+        "seriesParams": [
+          {
+            "show": true,
+            "type": "line",
+            "mode": "normal",
+            "data": { "label": "Critical", "id": "severity-critical" },
+            "drawLinesBetweenPoints": true,
+            "lineWidth": 3,
+            "interpolate": "cardinal",
+            "showCircles": true,
+            "valueAxis": "ValueAxis-1"
+          },
+          {
+            "show": true,
+            "type": "line",
+            "mode": "normal",
+            "data": { "label": "High", "id": "severity-high" },
+            "drawLinesBetweenPoints": true,
+            "lineWidth": 2,
+            "interpolate": "cardinal",
+            "showCircles": true,
+            "valueAxis": "ValueAxis-1"
+          },
+          {
+            "show": true,
+            "type": "area",
+            "mode": "stacked",
+            "data": { "label": "Medium", "id": "severity-medium" },
+            "drawLinesBetweenPoints": true,
+            "lineWidth": 1,
+            "interpolate": "cardinal",
+            "showCircles": false,
+            "valueAxis": "ValueAxis-1"
+          },
+          {
+            "show": true,
+            "type": "area",
+            "mode": "stacked",
+            "data": { "label": "Low / Info", "id": "severity-low" },
+            "drawLinesBetweenPoints": true,
+            "lineWidth": 1,
+            "interpolate": "cardinal",
+            "showCircles": false,
+            "valueAxis": "ValueAxis-1"
+          }
+        ],
+        "addTooltip": true,
+        "addLegend": true,
+        "legendPosition": "top",
+        "times": [],
+        "addTimeMarker": true,
+        "thresholdLine": {
+          "show": true,
+          "value": 50,
+          "width": 1,
+          "style": "dashed",
+          "color": "#ff4444"
+        },
+        "palette": {
+          "type": "custom",
+          "colors": ["#ff1744", "#ff6d00", "#ffab00", "#00e676", "#448aff"]
+        }
+      },
+      "aggs": [
+        {
+          "id": "1",
+          "enabled": true,
+          "type": "count",
+          "schema": "metric",
+          "params": {}
+        },
+        {
+          "id": "2",
+          "enabled": true,
+          "type": "date_histogram",
+          "schema": "segment",
+          "params": {
+            "field": "@timestamp",
+            "useNormalizedEsInterval": true,
+            "interval": "auto",
+            "min_doc_count": 0,
+            "extended_bounds": {},
+            "scaleMetricValues": false
+          }
+        },
+        {
+          "id": "3",
+          "enabled": true,
+          "type": "terms",
+          "schema": "group",
+          "params": {
+            "field": "event.severity",
+            "orderBy": "1",
+            "order": "desc",
+            "size": 5,
+            "otherBucket": false,
+            "otherBucketLabel": "Other",
+            "missingBucket": false,
+            "missingBucketLabel": "Missing"
+          }
+        }
+      ]
+    },
+    "uiStateJSON": {
+      "vis": {
+        "colors": {
+          "critical": "#ff1744",
+          "high": "#ff6d00",
+          "medium": "#ffab00",
+          "low": "#00e676",
+          "info": "#448aff"
+        }
+      }
+    },
+    "kibanaSavedObjectMeta": {
+      "searchSourceJSON": {
+        "index": "ruby-guardian-events-*",
+        "query": { "query": "", "language": "kuery" },
+        "filter": []
+      }
+    }
+  },
+  "id": "ruby-guardian-threat-timeline",
+  "type": "visualization",
+  "references": [
+    {
+      "id": "ruby-guardian-events-index-pattern",
+      "name": "kibanaSavedObjectMeta.searchSourceJSON.index",
+      "type": "index-pattern"
+    }
+  ],
+  "managed": false,
+  "coreMigrationVersion": "8.12.0"
+}

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#cc342d;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#e0115f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff4444;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#ffc0cb;stop-opacity:0.85" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Shield body -->
+  <path d="M32 4 L56 14 L56 30 C56 46 44 56 32 60 C20 56 8 46 8 30 L8 14 Z"
+        fill="url(#shieldGrad)" stroke="#8b0000" stroke-width="1.5" />
+
+  <!-- Shield inner border -->
+  <path d="M32 8 L52 16 L52 30 C52 43 42 52 32 56 C22 52 12 43 12 30 L12 16 Z"
+        fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+
+  <!-- Ruby gemstone -->
+  <polygon points="32,18 42,28 38,42 26,42 22,28"
+           fill="url(#gemGrad)" stroke="rgba(255,255,255,0.6)" stroke-width="0.8"
+           filter="url(#glow)" />
+
+  <!-- Gem facet lines -->
+  <line x1="32" y1="18" x2="32" y2="42" stroke="rgba(204,52,45,0.3)" stroke-width="0.5" />
+  <line x1="22" y1="28" x2="42" y2="28" stroke="rgba(204,52,45,0.3)" stroke-width="0.5" />
+  <line x1="26" y1="42" x2="42" y2="28" stroke="rgba(204,52,45,0.2)" stroke-width="0.5" />
+  <line x1="38" y1="42" x2="22" y2="28" stroke="rgba(204,52,45,0.2)" stroke-width="0.5" />
+
+  <!-- Eye/guardian symbol -->
+  <ellipse cx="32" cy="30" rx="6" ry="4" fill="none" stroke="rgba(204,52,45,0.5)" stroke-width="0.8" />
+  <circle cx="32" cy="30" r="2" fill="#cc342d" opacity="0.6" />
+
+  <!-- Shield highlight -->
+  <path d="M32 8 L52 16 L52 22 C42 20 22 20 12 22 L12 16 Z"
+        fill="rgba(255,255,255,0.1)" />
+</svg>

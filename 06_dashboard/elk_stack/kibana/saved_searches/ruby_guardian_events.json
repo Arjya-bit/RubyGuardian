@@ -1,0 +1,95 @@
+{
+  "attributes": {
+    "title": "RubyGuardian Security Events",
+    "description": "All security events captured by the RubyGuardian detection engine, including process spawns, network connections, file system modifications, and memory anomalies.",
+    "columns": [
+      "@timestamp",
+      "event.type",
+      "event.severity",
+      "event.category",
+      "process.name",
+      "process.pid",
+      "source.ip",
+      "destination.ip",
+      "rule.name",
+      "mitre.technique_id",
+      "mitre.tactic",
+      "threat.score",
+      "host.hostname"
+    ],
+    "sort": [
+      ["@timestamp", "desc"]
+    ],
+    "kibanaSavedObjectMeta": {
+      "searchSourceJSON": {
+        "index": "ruby-guardian-events-*",
+        "query": {
+          "query": "",
+          "language": "kuery"
+        },
+        "filter": [
+          {
+            "meta": {
+              "negate": false,
+              "disabled": false,
+              "alias": "Security Events Only",
+              "type": "exists",
+              "key": "event.type"
+            },
+            "exists": {
+              "field": "event.type"
+            }
+          }
+        ],
+        "highlight": {
+          "pre_tags": ["@kibana-highlighted-field@"],
+          "post_tags": ["@/kibana-highlighted-field@"],
+          "fields": {
+            "*": {}
+          },
+          "fragment_size": 2147483647
+        }
+      }
+    }
+  },
+  "id": "ruby-guardian-events-search",
+  "type": "search",
+  "references": [
+    {
+      "id": "ruby-guardian-events-index-pattern",
+      "name": "kibanaSavedObjectMeta.searchSourceJSON.index",
+      "type": "index-pattern"
+    }
+  ],
+  "managed": false,
+  "coreMigrationVersion": "8.12.0",
+  "typeMigrationVersion": "7.9.3",
+  "saved_searches": {
+    "critical_alerts": {
+      "title": "Critical Security Alerts",
+      "query": "event.severity: \"critical\" OR event.severity: \"high\"",
+      "columns": ["@timestamp", "event.type", "rule.name", "process.name", "threat.score"],
+      "sort": [["threat.score", "desc"]]
+    },
+    "process_hollowing_events": {
+      "title": "Process Hollowing Detections",
+      "query": "event.category: \"process_injection\" AND mitre.technique_id: \"T1055.012\"",
+      "columns": ["@timestamp", "process.name", "process.pid", "process.parent.pid", "rule.name"]
+    },
+    "network_exfiltration": {
+      "title": "Suspected Data Exfiltration",
+      "query": "event.category: \"network\" AND (threat.indicator.type: \"dns_exfiltration\" OR network.bytes_out > 1048576)",
+      "columns": ["@timestamp", "source.ip", "destination.ip", "network.protocol", "network.bytes_out"]
+    },
+    "honeypot_interactions": {
+      "title": "Honeypot Captured Events",
+      "query": "event.dataset: \"honeypot\" AND event.kind: \"alert\"",
+      "columns": ["@timestamp", "source.ip", "honeypot.service", "honeypot.interaction_type", "threat.score"]
+    },
+    "eval_chain_detections": {
+      "title": "Ruby eval() Chain Detections",
+      "query": "rule.name: *eval* OR event.category: \"code_execution\"",
+      "columns": ["@timestamp", "process.name", "process.command_line", "rule.name", "event.severity"]
+    }
+  }
+}

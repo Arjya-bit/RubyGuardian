@@ -1,0 +1,137 @@
+# =============================================================================
+# RubyGuardian Phase 1c -- Benign Ruby One-Liners Database
+#
+# EDUCATIONAL PURPOSE ONLY -- Authorized security research.
+# This YAML database catalogs legitimate Ruby one-liners that use the same
+# standard library APIs as attack techniques. Understanding benign usage
+# patterns helps defenders reduce false positives when building detection
+# rules for malicious Ruby activity.
+#
+# Each entry includes:
+#   - code: The one-liner itself
+#   - description: What it does
+#   - category: Functional category
+#   - ruby_apis: Standard library APIs used
+#   - legitimate_use: Why this pattern is common in production code
+# =============================================================================
+
+---
+- code: "ruby -e 'puts ENV.select { |k,_| k =~ /PATH|HOME|USER/ }'"
+  description: "Display common environment variables for debugging"
+  category: system_info
+  ruby_apis: ["ENV", "Enumerable#select"]
+  legitimate_use: "Developers troubleshoot PATH and environment configuration issues"
+
+- code: "ruby -rjson -e 'puts JSON.pretty_generate(JSON.parse(STDIN.read))'"
+  description: "Pretty-print JSON from stdin"
+  category: data_processing
+  ruby_apis: ["JSON.parse", "JSON.pretty_generate", "STDIN"]
+  legitimate_use: "Formatting API responses and config files for readability"
+
+- code: "ruby -e 'require \"webrick\"; WEBrick::HTTPServer.new(Port: 8000, DocumentRoot: \".\").start'"
+  description: "Start a simple HTTP file server in the current directory"
+  category: networking
+  ruby_apis: ["WEBrick::HTTPServer"]
+  legitimate_use: "Quick file sharing during development or testing"
+
+- code: "ruby -rcsv -e 'CSV.foreach(ARGV[0], headers: true) { |r| puts r.to_h }'"
+  description: "Parse and display CSV file contents as hashes"
+  category: data_processing
+  ruby_apis: ["CSV.foreach"]
+  legitimate_use: "Quick data inspection of CSV exports and reports"
+
+- code: "ruby -e 'puts Dir.glob(\"**/*.rb\").map { |f| [f, File.size(f)] }.sort_by(&:last).reverse.first(10).map { |f,s| \"#{s.to_s.rjust(8)} #{f}\" }'"
+  description: "Find the 10 largest Ruby files in a project"
+  category: file_operations
+  ruby_apis: ["Dir.glob", "File.size"]
+  legitimate_use: "Identifying large files for refactoring or code review"
+
+- code: "ruby -rnet/http -e 'puts Net::HTTP.get(URI(ARGV[0]))'"
+  description: "Fetch and display content from a URL"
+  category: networking
+  ruby_apis: ["Net::HTTP.get", "URI"]
+  legitimate_use: "Quick API health checks and endpoint testing"
+
+- code: "ruby -rdigest -e 'puts Digest::SHA256.hexdigest(File.read(ARGV[0]))'"
+  description: "Calculate SHA-256 hash of a file"
+  category: cryptography
+  ruby_apis: ["Digest::SHA256", "File.read"]
+  legitimate_use: "Verifying file integrity and comparing checksums"
+
+- code: "ruby -rsocket -e 'puts Socket.ip_address_list.select(&:ipv4?).map(&:ip_address)'"
+  description: "List all IPv4 addresses on the local machine"
+  category: networking
+  ruby_apis: ["Socket.ip_address_list"]
+  legitimate_use: "Network configuration debugging and service binding"
+
+- code: "ruby -e 'puts ObjectSpace.count_objects.sort_by { |_,v| -v }.first(10).map { |k,v| \"#{k}: #{v}\" }'"
+  description: "Display top object types in current Ruby process by count"
+  category: debugging
+  ruby_apis: ["ObjectSpace.count_objects"]
+  legitimate_use: "Memory profiling and leak detection in Ruby applications"
+
+- code: "ruby -ryaml -e 'puts YAML.dump(YAML.safe_load(File.read(ARGV[0])))'"
+  description: "Reformat a YAML file with consistent indentation"
+  category: data_processing
+  ruby_apis: ["YAML.safe_load", "YAML.dump", "File.read"]
+  legitimate_use: "Normalizing configuration files across environments"
+
+- code: "ruby -e 'require \"open3\"; stdout, status = Open3.capture2(\"ls\", \"-la\"); puts stdout'"
+  description: "Execute a shell command and capture its output safely"
+  category: system_admin
+  ruby_apis: ["Open3.capture2"]
+  legitimate_use: "Build scripts and automation tooling that invoke system commands"
+
+- code: "ruby -rbase64 -e 'puts Base64.strict_encode64(File.binread(ARGV[0]))'"
+  description: "Base64-encode a file for embedding or transmission"
+  category: encoding
+  ruby_apis: ["Base64.strict_encode64", "File.binread"]
+  legitimate_use: "Encoding binary assets for inclusion in JSON APIs or configs"
+
+- code: "ruby -e 'puts RubyVM::InstructionSequence.compile(File.read(ARGV[0])).disasm'"
+  description: "Disassemble a Ruby file to show YARV bytecode instructions"
+  category: debugging
+  ruby_apis: ["RubyVM::InstructionSequence"]
+  legitimate_use: "Performance analysis and understanding Ruby compilation"
+
+- code: "ruby -rbenchmark -e 'puts Benchmark.measure { 1_000_000.times { \"hello\".reverse } }'"
+  description: "Benchmark a simple string operation"
+  category: performance
+  ruby_apis: ["Benchmark.measure"]
+  legitimate_use: "Quick performance measurement during optimization"
+
+- code: "ruby -rfileutils -e 'FileUtils.cp_r(ARGV[0], ARGV[1])'"
+  description: "Recursively copy a directory"
+  category: file_operations
+  ruby_apis: ["FileUtils.cp_r"]
+  legitimate_use: "Backup scripts and deployment automation"
+
+- code: "ruby -rtempfile -e 't = Tempfile.new(\"data\"); t.write(STDIN.read); puts t.path; t.close'"
+  description: "Write stdin to a temporary file and print its path"
+  category: file_operations
+  ruby_apis: ["Tempfile.new"]
+  legitimate_use: "Pipeline data processing with intermediate temp files"
+
+- code: "ruby -rlogger -e 'l = Logger.new(STDOUT); l.info(\"Application started\"); l.warn(\"Low disk\")'"
+  description: "Demonstrate basic logging with severity levels"
+  category: logging
+  ruby_apis: ["Logger"]
+  legitimate_use: "Application logging and observability setup"
+
+- code: "ruby -e 'puts Process.pid, Process.ppid, Process.uid, Process.gid'"
+  description: "Display current process ID, parent PID, UID, and GID"
+  category: system_info
+  ruby_apis: ["Process.pid", "Process.ppid", "Process.uid"]
+  legitimate_use: "Process management and daemonization scripts"
+
+- code: "ruby -rerb -e 'puts ERB.new(File.read(ARGV[0])).result(binding)'"
+  description: "Render an ERB template with the current binding"
+  category: templating
+  ruby_apis: ["ERB"]
+  legitimate_use: "Configuration file generation from templates"
+
+- code: "ruby -e 'GC.start(full_mark: true); puts GC.stat.map { |k,v| \"#{k}: #{v}\" }'"
+  description: "Run full garbage collection and display GC statistics"
+  category: debugging
+  ruby_apis: ["GC.start", "GC.stat"]
+  legitimate_use: "Memory management tuning and GC behavior analysis"
