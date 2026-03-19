@@ -1,0 +1,154 @@
+# RubyGuardian Honeypot - Fake CI Runner Configuration
+# This configuration mimics a GitLab CI runner setup.
+#
+# HONEYPOT WARNING: All credentials, tokens, and secrets are fabricated canaries.
+# Any use of these values will trigger security alerts.
+
+runner:
+  # Runner identification
+  name: "shared-runner-01"
+  description: "Shared CI runner for Ruby projects"
+  url: "https://gitlab.internal.example.com"
+  token: "glrt-FAKE_RUNNER_TOKEN_1234567890"
+  executor: "docker"
+
+  # Runner tags
+  tags:
+    - ruby
+    - docker
+    - linux
+
+  # Runner limits
+  limit: 10
+  request_concurrency: 5
+  output_limit: 4096
+
+  # Docker executor configuration
+  docker:
+    image: "ruby:3.2.2-alpine"
+    privileged: false
+    disable_entrypoint_overwrite: false
+    oom_kill_disable: false
+    disable_cache: false
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/cache:/cache"
+      - "/builds:/builds"
+    shm_size: 0
+    network_mode: "bridge"
+    pull_policy:
+      - "if-not-present"
+    allowed_images:
+      - "ruby:*"
+      - "node:*"
+      - "postgres:*"
+      - "redis:*"
+
+  # Cache configuration
+  cache:
+    type: "s3"
+    path: "runner-cache"
+    shared: true
+    s3:
+      server_address: "s3.internal.example.com"
+      access_key: "AKIAFAKE1234567890AB"
+      secret_key: "fAkEsEcReTkEy1234567890abcdefghijklmnop"
+      bucket_name: "ci-runner-cache"
+      bucket_location: "us-east-1"
+      insecure: false
+
+# Server configuration for the honeypot web interface
+server:
+  bind: "0.0.0.0"
+  port: 8080
+  environment: "production"
+  workers: 2
+  threads:
+    min: 1
+    max: 5
+  pidfile: "/var/run/ci-runner.pid"
+
+# Honeypot-specific settings
+honeypot:
+  enabled: true
+  log_level: "debug"
+  log_directory: "/var/log/rubyguardian/honeypot"
+
+  # Fake projects registered to this runner
+  projects:
+    - id: 42
+      name: "internal-webapp"
+      namespace: "engineering/backend"
+      default_branch: "main"
+      visibility: "internal"
+      build_count: 1247
+    - id: 43
+      name: "api-gateway"
+      namespace: "engineering/backend"
+      default_branch: "main"
+      visibility: "internal"
+      build_count: 892
+    - id: 44
+      name: "worker-service"
+      namespace: "engineering/backend"
+      default_branch: "main"
+      visibility: "private"
+      build_count: 456
+
+  # Planted secrets that trigger alerts when accessed
+  canary_secrets:
+    - name: "AWS Credentials"
+      type: "aws_key"
+      key_id: "AKIAFAKE1234567890AB"
+      secret: "fAkEsEcReTkEy1234567890abcdefghijklmnop"
+      alert_on_use: true
+    - name: "GitHub Token"
+      type: "github_pat"
+      token: "ghp_fake1234567890abcdefghijklmnopqrstuv"
+      alert_on_use: true
+    - name: "Database Password"
+      type: "password"
+      value: "D3pl0y$ecret"
+      service: "postgresql"
+      alert_on_use: true
+    - name: "Docker Registry"
+      type: "docker_auth"
+      username: "deploy"
+      password: "d0ck3r_r3g1stry_p4ssw0rd"
+      registry: "registry.internal.example.com"
+      alert_on_use: true
+    - name: "Vault Token"
+      type: "vault_token"
+      token: "hvs.PLACEHOLDER-NOT-REAL-TOKEN"
+      alert_on_use: true
+    - name: "K8s Service Account"
+      type: "k8s_token"
+      token: "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZha2UifQ.fake_k8s_token_data"
+      cluster: "production-cluster"
+      alert_on_use: true
+
+  # Response behavior configuration
+  response:
+    # Add realistic latency to responses
+    jitter_ms: 50
+    # Maximum number of requests before throttling
+    rate_limit:
+      requests_per_minute: 120
+      burst: 20
+    # How deep to allow interaction before returning errors
+    max_depth: 15
+
+  # Alert configuration
+  alerts:
+    # Events that trigger immediate alerts
+    critical_events:
+      - "project_variables_access"
+      - "runner_env_access"
+      - "proc_environ_access"
+      - "artifact_download"
+      - "job_trace_access"
+    # Notification channels
+    notify:
+      syslog: true
+      file: true
+      webhook: false

@@ -1,0 +1,92 @@
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+/.bundle/
+/vendor/bundle
+Gemfile.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+.venv/
+venv/
+ENV/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+log/
+*.log
+
+# Database
+*.sqlite3
+*.db
+
+# Memory dumps (large binary files)
+*.dmp
+*.core
+*.dump
+
+# ML Models (large binary files - track with Git LFS)
+03_ml_classifier/models/saved_models/*.pkl
+03_ml_classifier/models/saved_models/*.pt
+03_ml_classifier/models/saved_models/*.h5
+
+# Docker
+.docker/
+
+# Vagrant
+.vagrant/
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+
+# Coverage
+.coverage
+htmlcov/
+.nyc_output/
+
+# Compiled payloads
+*.bin
+
+# Temporary
+.tmp/
+temp/

@@ -1,0 +1,252 @@
+# =============================================================================
+# RubyGuardian - Dashboard Deployment
+# =============================================================================
+# Deploys the React-based web UI, Kibana, and Grafana behind an Nginx
+# reverse-proxy sidecar.  The dashboard aggregates data from Elasticsearch
+# and the ML classifier API.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/component: visualization
+    app.kubernetes.io/part-of: rubyguardian
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    description: "RubyGuardian unified monitoring and visualization dashboard"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dashboard
+        app.kubernetes.io/component: visualization
+        app.kubernetes.io/part-of: rubyguardian
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: dashboard
+      terminationGracePeriodSeconds: 30
+
+      initContainers:
+        - name: init-wait-elasticsearch
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Elasticsearch..."
+              until wget -qO- http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200/_cluster/health 2>/dev/null; do
+                sleep 5
+              done
+              echo "Elasticsearch is available."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+      containers:
+        # --- React Web UI --------------------------------------------------
+        - name: web-ui
+          image: rubyguardian/web-ui:1.0.0
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http-ui
+              containerPort: 5173
+              protocol: TCP
+
+          env:
+            - name: VITE_ES_URL
+              value: http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200
+            - name: VITE_CLASSIFIER_URL
+              value: http://ml-classifier-svc.rubyguardian.svc.cluster.local:8000
+            - name: VITE_WS_URL
+              value: ws://detection-agent-svc.rubyguardian.svc.cluster.local:8080
+            - name: NODE_ENV
+              value: production
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-ui
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-ui
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+
+        # --- Kibana --------------------------------------------------------
+        - name: kibana
+          image: docker.elastic.co/kibana/kibana:8.11.3
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http-kibana
+              containerPort: 5601
+              protocol: TCP
+
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: '["http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200"]'
+            - name: SERVER_NAME
+              value: rubyguardian-kibana
+            - name: SERVER_BASEPATH
+              value: /kibana
+            - name: SERVER_REWRITEBASEPATH
+              value: "true"
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+
+          livenessProbe:
+            httpGet:
+              path: /kibana/api/status
+              port: http-kibana
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /kibana/api/status
+              port: http-kibana
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+        # --- Grafana -------------------------------------------------------
+        - name: grafana
+          image: grafana/grafana:10.2.3
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http-grafana
+              containerPort: 3000
+              protocol: TCP
+
+          env:
+            - name: GF_SERVER_ROOT_URL
+              value: "%(protocol)s://%(domain)s/grafana/"
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rubyguardian-secrets
+                  key: grafana_admin_password
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-clock-panel,grafana-piechart-panel"
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+
+          livenessProbe:
+            httpGet:
+              path: /grafana/api/health
+              port: http-grafana
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+          readinessProbe:
+            httpGet:
+              path: /grafana/api/health
+              port: http-grafana
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-storage
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dashboard
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/part-of: rubyguardian
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/part-of: rubyguardian
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi

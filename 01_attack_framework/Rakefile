@@ -1,0 +1,41 @@
+# frozen_string_literal: true
+
+require 'rake'
+require 'rspec/core/rake_task'
+
+desc 'Run all attack framework specs'
+RSpec::Core::RakeTask.new(:spec) do |t|
+  t.pattern = '**/specs/**/*_spec.rb'
+  t.rspec_opts = '--format documentation'
+end
+
+namespace :demo do
+  desc 'Run process hollowing demo (requires isolated environment)'
+  task :hollow do
+    ruby '1a_process_hollowing/scripts/run_hollow_demo.rb'
+  end
+
+  desc 'Run CI/CD poisoning demo'
+  task :cicd do
+    sh 'bash 1b_cicd_poisoning/scripts/run_pipeline_attack.sh'
+  end
+
+  desc 'List LoLRuby techniques'
+  task :lolruby do
+    ruby '1c_lolruby/lolruby_database/query_interface.rb'
+  end
+
+  desc 'Run ObjectSpace persistence demo'
+  task :objectspace do
+    ruby '1d_objectspace_persistence/scripts/inject_into_rails.rb'
+  end
+end
+
+namespace :c2 do
+  desc 'Start C2 server'
+  task :start do
+    sh 'cd 1b_cicd_poisoning/c2_server && bundle exec rackup config.ru -o 127.0.0.1 -p 4444'
+  end
+end
+
+task default: :spec

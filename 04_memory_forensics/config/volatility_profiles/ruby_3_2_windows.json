@@ -1,0 +1,212 @@
+{
+  "profile_name": "ruby_3_2_windows",
+  "ruby_version": "3.2.x",
+  "platform": "windows",
+  "architecture": "x86_64",
+  "description": "Volatility profile for Ruby 3.2.x on Windows x86_64 (RubyInstaller). Contains Windows-specific structure offsets accounting for MSVC ABI differences and Windows thread/memory management.",
+  "abi": {
+    "pointer_size": 8,
+    "alignment": 8,
+    "endianness": "little",
+    "calling_convention": "Microsoft x64",
+    "compiler": "MSVC",
+    "notes": "Windows x64 ABI uses rcx, rdx, r8, r9 for first 4 integer args (differs from SysV ABI)"
+  },
+  "windows_specifics": {
+    "ruby_dll": "x64-msvcrt-ruby320.dll",
+    "libruby_dll": "msvcrt-ruby320.dll",
+    "default_install_path": "C:\\Ruby32-x64",
+    "thread_implementation": "win32_thread",
+    "memory_management": {
+      "heap_api": "HeapAlloc/HeapFree",
+      "page_size": 4096,
+      "allocation_granularity": 65536,
+      "large_page_size": 2097152
+    },
+    "pe_sections": {
+      ".text": "Executable code",
+      ".rdata": "Read-only data (includes Ruby string literals)",
+      ".data": "Read-write global data (includes VM state)",
+      ".pdata": "Exception handling data",
+      ".rsrc": "Resources"
+    }
+  },
+  "structures": {
+    "RBasic": {
+      "size": 16,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "VALUE" },
+        "klass": { "offset": 8, "size": 8, "type": "VALUE" }
+      }
+    },
+    "RObject": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "numiv": { "offset": 16, "size": 4, "type": "uint32_t" },
+            "ivptr": { "offset": 24, "size": 8, "type": "VALUE*" },
+            "iv_index_tbl": { "offset": 32, "size": 8, "type": "void*" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      }
+    },
+    "RString": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long long" },
+            "ptr": { "offset": 24, "size": 8, "type": "char*" },
+            "aux": {
+              "capa": { "offset": 32, "size": 8, "type": "long long" }
+            }
+          },
+          "embed": {
+            "len_and_terminator": { "offset": 16, "size": 8, "type": "long long" },
+            "ary": { "offset": 24, "size": 16, "type": "char[]" }
+          }
+        }
+      },
+      "flags": {
+        "STR_NOEMBED": "0x2000",
+        "STR_SHARED": "0x4000",
+        "STR_FROZEN": "0x8000",
+        "EMBED_LEN_MASK": "0x1f0000",
+        "EMBED_LEN_SHIFT": 16
+      },
+      "note": "Windows uses long long (8 bytes) where Linux uses long (8 bytes on x64). Functionally equivalent on x64 but different types."
+    },
+    "RArray": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long long" },
+            "aux": {
+              "capa": { "offset": 24, "size": 8, "type": "long long" }
+            },
+            "ptr": { "offset": 32, "size": 8, "type": "VALUE*" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      }
+    },
+    "rb_vm_t": {
+      "size": 2048,
+      "fields": {
+        "running_thread": { "offset": 0, "size": 8, "type": "rb_thread_t*" },
+        "ractor": {
+          "cnt": { "offset": 16, "size": 4, "type": "int" }
+        },
+        "objspace": { "offset": 48, "size": 8, "type": "rb_objspace_t*" },
+        "loading_table": { "offset": 56, "size": 8, "type": "st_table*" },
+        "frozen_strings": { "offset": 64, "size": 8, "type": "st_table*" }
+      }
+    },
+    "rb_thread_t": {
+      "size": 1024,
+      "fields": {
+        "self": { "offset": 0, "size": 8, "type": "VALUE" },
+        "vm": { "offset": 8, "size": 8, "type": "rb_vm_t*" },
+        "cfp": { "offset": 16, "size": 8, "type": "rb_control_frame_t*" },
+        "ec": { "offset": 24, "size": 8, "type": "rb_execution_context_t*" },
+        "status": { "offset": 32, "size": 4, "type": "int" },
+        "priority": { "offset": 36, "size": 4, "type": "int" },
+        "thread_handle": { "offset": 40, "size": 8, "type": "HANDLE", "comment": "Windows thread handle (replaces pthread_t)" },
+        "thread_id": { "offset": 48, "size": 4, "type": "DWORD", "comment": "Windows thread ID" }
+      }
+    },
+    "rb_control_frame_t": {
+      "size": 48,
+      "fields": {
+        "pc": { "offset": 0, "size": 8, "type": "VALUE*" },
+        "sp": { "offset": 8, "size": 8, "type": "VALUE*" },
+        "iseq": { "offset": 16, "size": 8, "type": "rb_iseq_t*" },
+        "self": { "offset": 24, "size": 8, "type": "VALUE" },
+        "ep": { "offset": 32, "size": 8, "type": "VALUE*" },
+        "block_code": { "offset": 40, "size": 8, "type": "void*" }
+      }
+    },
+    "rb_objspace_t": {
+      "size": 4096,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "unsigned long long" },
+        "heap_pages": {
+          "sorted": { "offset": 16, "size": 8, "type": "rb_heap_page_t**" },
+          "sorted_length": { "offset": 24, "size": 4, "type": "int" },
+          "allocated_pages": { "offset": 28, "size": 4, "type": "int" }
+        },
+        "total_allocated_objects": { "offset": 48, "size": 8, "type": "size_t" },
+        "total_freed_objects": { "offset": 56, "size": 8, "type": "size_t" },
+        "malloc_increase": { "offset": 64, "size": 8, "type": "size_t" }
+      }
+    },
+    "rb_heap_page_t": {
+      "size": 80,
+      "fields": {
+        "flags": { "offset": 0, "size": 2, "type": "unsigned short" },
+        "total_slots": { "offset": 2, "size": 2, "type": "unsigned short" },
+        "free_slots": { "offset": 4, "size": 2, "type": "unsigned short" },
+        "final_slots": { "offset": 6, "size": 2, "type": "unsigned short" },
+        "start": { "offset": 8, "size": 8, "type": "RVALUE*" },
+        "freelist": { "offset": 16, "size": 8, "type": "RVALUE*" },
+        "prev": { "offset": 24, "size": 8, "type": "rb_heap_page_t*" },
+        "next": { "offset": 32, "size": 8, "type": "rb_heap_page_t*" },
+        "body": { "offset": 40, "size": 8, "type": "rb_heap_page_body_t*" }
+      },
+      "constants": {
+        "HEAP_PAGE_OBJ_LIMIT": 409,
+        "HEAP_PAGE_SIZE": 16384,
+        "RVALUE_SIZE": 40
+      }
+    },
+    "CRITICAL_SECTION": {
+      "size": 40,
+      "fields": {
+        "DebugInfo": { "offset": 0, "size": 8, "type": "PRTL_CRITICAL_SECTION_DEBUG" },
+        "LockCount": { "offset": 8, "size": 4, "type": "LONG" },
+        "RecursionCount": { "offset": 12, "size": 4, "type": "LONG" },
+        "OwningThread": { "offset": 16, "size": 8, "type": "HANDLE" },
+        "LockSemaphore": { "offset": 24, "size": 8, "type": "HANDLE" },
+        "SpinCount": { "offset": 32, "size": 8, "type": "ULONG_PTR" }
+      },
+      "comment": "Windows CRITICAL_SECTION used by Ruby for mutex implementation"
+    }
+  },
+  "symbols": {
+    "ruby_current_vm_ptr": {
+      "description": "Global pointer to the current Ruby VM instance",
+      "type": "rb_vm_t*",
+      "dll": "x64-msvcrt-ruby320.dll"
+    },
+    "ruby_current_execution_context_ptr": {
+      "description": "Thread-local pointer to current execution context",
+      "type": "rb_execution_context_t*",
+      "storage": "TLS",
+      "tls_index_symbol": "ruby_current_ec_tls_index"
+    }
+  },
+  "forensic_notes": {
+    "acquisition": [
+      "Use MiniDumpWriteDump with MiniDumpWithFullMemory flag for complete dumps",
+      "ProcDump (Sysinternals) can capture dumps without attaching a debugger",
+      "Task Manager can create dumps but may not capture all memory regions",
+      "WinDbg .dump /ma command provides most comprehensive dumps"
+    ],
+    "analysis_tips": [
+      "Check PEB for loaded DLL list - malicious DLLs may be injected",
+      "TLS slots may contain Ruby execution context pointers",
+      "Windows heap metadata can help identify allocation patterns",
+      "SEH chain analysis can reveal exception handler hijacking"
+    ]
+  }
+}

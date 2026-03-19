@@ -1,0 +1,141 @@
+{
+  "index_patterns": ["rg-events-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.lifecycle.name": "rg-events-policy",
+      "index.lifecycle.rollover_alias": "rg-events",
+      "analysis": {
+        "analyzer": {
+          "ruby_code_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "ruby_keywords"]
+          }
+        },
+        "filter": {
+          "ruby_keywords": {
+            "type": "keyword_marker",
+            "keywords": ["eval", "exec", "system", "send", "define_method", "instance_eval", "class_eval", "binding", "open", "require", "load"]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "event_id": { "type": "keyword" },
+        "event_type": { "type": "keyword" },
+        "severity": { "type": "keyword" },
+        "threat_score": { "type": "float" },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "keyword" },
+            "hostname": { "type": "keyword" },
+            "ip": { "type": "ip" },
+            "version": { "type": "keyword" },
+            "os": { "type": "keyword" }
+          }
+        },
+        "process": {
+          "type": "object",
+          "properties": {
+            "pid": { "type": "integer" },
+            "ppid": { "type": "integer" },
+            "name": { "type": "keyword" },
+            "executable": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+            "command_line": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 2048 } } },
+            "user": { "type": "keyword" },
+            "start_time": { "type": "date" },
+            "memory_usage": { "type": "long" },
+            "cpu_percent": { "type": "float" }
+          }
+        },
+        "ruby": {
+          "type": "object",
+          "properties": {
+            "version": { "type": "keyword" },
+            "gem_name": { "type": "keyword" },
+            "gem_version": { "type": "keyword" },
+            "method_called": { "type": "keyword" },
+            "code_snippet": { "type": "text", "analyzer": "ruby_code_analyzer" },
+            "call_stack": { "type": "text" },
+            "source_file": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+            "source_line": { "type": "integer" },
+            "eval_detected": { "type": "boolean" },
+            "obfuscation_score": { "type": "float" }
+          }
+        },
+        "network": {
+          "type": "object",
+          "properties": {
+            "source_ip": { "type": "ip" },
+            "destination_ip": { "type": "ip" },
+            "source_port": { "type": "integer" },
+            "destination_port": { "type": "integer" },
+            "protocol": { "type": "keyword" },
+            "bytes_sent": { "type": "long" },
+            "bytes_received": { "type": "long" },
+            "dns_query": { "type": "keyword" }
+          }
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+            "hash_sha256": { "type": "keyword" },
+            "hash_md5": { "type": "keyword" },
+            "size": { "type": "long" },
+            "action": { "type": "keyword" },
+            "owner": { "type": "keyword" },
+            "permissions": { "type": "keyword" }
+          }
+        },
+        "attack": {
+          "type": "object",
+          "properties": {
+            "technique": { "type": "keyword" },
+            "technique_id": { "type": "keyword" },
+            "tactic": { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "description": { "type": "text" },
+            "ioc": { "type": "keyword" },
+            "confidence": { "type": "float" }
+          }
+        },
+        "mitre": {
+          "type": "object",
+          "properties": {
+            "technique_id": { "type": "keyword" },
+            "technique_name": { "type": "keyword" },
+            "tactic": { "type": "keyword" },
+            "subtechnique_id": { "type": "keyword" }
+          }
+        },
+        "geo": {
+          "type": "object",
+          "properties": {
+            "location": { "type": "geo_point" },
+            "country_iso_code": { "type": "keyword" },
+            "country_name": { "type": "keyword" },
+            "city_name": { "type": "keyword" },
+            "region_name": { "type": "keyword" },
+            "asn": { "type": "integer" },
+            "org": { "type": "keyword" }
+          }
+        },
+        "tags": { "type": "keyword" },
+        "raw_message": { "type": "text" }
+      }
+    }
+  },
+  "_meta": {
+    "description": "RubyGuardian security events index template",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,47 @@
+# RubyGuardian Detection Engine -- Test Configuration
+engine:
+  agent_id: test-agent-001
+  environment: test
+  log_level: debug
+  log_file: /tmp/ruby-guardian-test/agent.log
+  pid_file: /tmp/ruby-guardian-test/agent.pid
+  heartbeat_interval: 5
+
+monitoring:
+  process:
+    enabled: true
+    poll_interval: 1
+    watch_patterns:
+      - ruby
+      - irb
+  syscall:
+    enabled: false
+  memory:
+    enabled: true
+    scan_interval: 5
+  network:
+    enabled: false
+  filesystem:
+    enabled: true
+    watch_paths:
+      - /tmp/ruby-guardian-test
+  objectspace:
+    enabled: true
+    scan_interval: 10
+
+detection:
+  rules_dir: config/rules
+  correlation:
+    enabled: true
+    window_seconds: 60
+
+alerting:
+  min_severity: low
+  dedup_window_seconds: 10
+  channels:
+    log:
+      enabled: true
+    webhook:
+      enabled: false
+    siem:
+      enabled: false

@@ -1,0 +1,44 @@
+# Payload Registry
+# All payloads are benign PoC demonstrations
+
+payloads:
+  - name: calc_spawn_x64
+    type: shellcode
+    platform: windows
+    arch: x64
+    risk_level: low
+    description: "Spawns Windows calculator (benign PoC)"
+    file: "1a_process_hollowing/payloads/shellcode/calc_spawn_x64.bin"
+
+  - name: id_exec_x64
+    type: shellcode
+    platform: linux
+    arch: x64
+    risk_level: low
+    description: "Executes 'id' command (benign PoC)"
+    file: "1a_process_hollowing/payloads/shellcode/id_exec_x64.bin"
+
+  - name: reverse_shell_template
+    type: shellcode
+    platform: cross
+    arch: x64
+    risk_level: medium
+    description: "Configurable reverse shell template (localhost only)"
+    file: "1a_process_hollowing/payloads/shellcode/reverse_shell_template.bin"
+    config:
+      default_host: "127.0.0.1"
+      default_port: 4444
+
+  - name: stage2_memory_only
+    type: ruby_script
+    platform: cross
+    risk_level: medium
+    description: "In-memory only Ruby payload (no disk writes)"
+    file: "1b_cicd_poisoning/c2_server/payloads/stage2_memory_only.rb"
+
+  - name: stage2_recon
+    type: ruby_script
+    platform: cross
+    risk_level: low
+    description: "System reconnaissance payload"
+    file: "1b_cicd_poisoning/c2_server/payloads/stage2_recon.rb"

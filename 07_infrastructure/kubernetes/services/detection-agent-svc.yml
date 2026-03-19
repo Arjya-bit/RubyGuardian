@@ -1,0 +1,31 @@
+# =============================================================================
+# RubyGuardian - Detection Agent Service
+# =============================================================================
+# Exposes the detection agent health-check and WebSocket endpoints within
+# the cluster.  The dashboard connects to the WebSocket for live alert feeds.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: detection-agent-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: detection-agent
+    app.kubernetes.io/component: detection
+    app.kubernetes.io/part-of: rubyguardian
+  annotations:
+    description: "Cluster-internal service for the detection agent health and WebSocket endpoints"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: detection-agent
+  ports:
+    - name: http-health
+      port: 8080
+      targetPort: http-health
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP

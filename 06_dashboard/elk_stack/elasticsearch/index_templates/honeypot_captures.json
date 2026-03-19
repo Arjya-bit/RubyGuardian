@@ -1,0 +1,121 @@
+{
+  "index_patterns": ["rg-honeypot-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.lifecycle.name": "rg-honeypot-policy",
+      "index.lifecycle.rollover_alias": "rg-honeypot"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "capture_id": { "type": "keyword" },
+        "honeypot": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "keyword" },
+            "name": { "type": "keyword" },
+            "type": { "type": "keyword" },
+            "profile": { "type": "keyword" },
+            "deployed_at": { "type": "date" }
+          }
+        },
+        "attacker": {
+          "type": "object",
+          "properties": {
+            "ip": { "type": "ip" },
+            "port": { "type": "integer" },
+            "user_agent": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+            "fingerprint": { "type": "keyword" },
+            "session_id": { "type": "keyword" },
+            "auth_attempts": { "type": "integer" },
+            "username_tried": { "type": "keyword" },
+            "geo": {
+              "type": "object",
+              "properties": {
+                "location": { "type": "geo_point" },
+                "country_iso_code": { "type": "keyword" },
+                "country_name": { "type": "keyword" },
+                "city_name": { "type": "keyword" },
+                "asn": { "type": "integer" },
+                "org": { "type": "keyword" }
+              }
+            }
+          }
+        },
+        "interaction": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "keyword" },
+            "protocol": { "type": "keyword" },
+            "duration_ms": { "type": "long" },
+            "commands": { "type": "text" },
+            "command_count": { "type": "integer" },
+            "files_uploaded": {
+              "type": "nested",
+              "properties": {
+                "filename": { "type": "keyword" },
+                "size": { "type": "long" },
+                "hash_sha256": { "type": "keyword" },
+                "mime_type": { "type": "keyword" },
+                "malicious": { "type": "boolean" }
+              }
+            },
+            "payloads_delivered": {
+              "type": "nested",
+              "properties": {
+                "type": { "type": "keyword" },
+                "content": { "type": "text" },
+                "hash_sha256": { "type": "keyword" },
+                "decoded_content": { "type": "text" }
+              }
+            }
+          }
+        },
+        "ruby_exploit": {
+          "type": "object",
+          "properties": {
+            "technique": { "type": "keyword" },
+            "target_gem": { "type": "keyword" },
+            "target_version": { "type": "keyword" },
+            "exploit_code": { "type": "text" },
+            "cve": { "type": "keyword" },
+            "success": { "type": "boolean" },
+            "stage": { "type": "keyword" }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "properties": {
+            "attack_type": { "type": "keyword" },
+            "sophistication": { "type": "keyword" },
+            "automation_detected": { "type": "boolean" },
+            "known_tool": { "type": "keyword" },
+            "threat_actor_group": { "type": "keyword" }
+          }
+        },
+        "network": {
+          "type": "object",
+          "properties": {
+            "bytes_sent": { "type": "long" },
+            "bytes_received": { "type": "long" },
+            "packets_sent": { "type": "long" },
+            "packets_received": { "type": "long" },
+            "dns_queries": { "type": "keyword" },
+            "http_requests": { "type": "integer" }
+          }
+        },
+        "tags": { "type": "keyword" },
+        "notes": { "type": "text" }
+      }
+    }
+  },
+  "_meta": {
+    "description": "RubyGuardian honeypot capture index template",
+    "version": "1.0.0"
+  }
+}

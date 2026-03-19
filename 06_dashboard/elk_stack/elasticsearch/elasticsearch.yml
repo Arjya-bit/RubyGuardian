@@ -1,0 +1,70 @@
+# =============================================================================
+# RubyGuardian - Elasticsearch Configuration
+# =============================================================================
+# Production-ready configuration for security event storage and search
+
+cluster.name: "ruby-guardian"
+node.name: "rg-es-node-1"
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Path settings
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Discovery settings (single-node for default deployment)
+discovery.type: single-node
+
+# Security settings
+xpack.security.enabled: true
+xpack.security.enrollment.enabled: false
+
+xpack.security.http.ssl:
+  enabled: false
+
+xpack.security.transport.ssl:
+  enabled: false
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Index settings
+action.auto_create_index: "+rg-*,-*"
+action.destructive_requires_name: true
+
+# Thread pool tuning for security workloads
+thread_pool:
+  search:
+    size: 12
+    queue_size: 1000
+  write:
+    size: 6
+    queue_size: 500
+
+# Slow log thresholds
+index.search.slowlog.threshold.query.warn: 10s
+index.search.slowlog.threshold.query.info: 5s
+index.search.slowlog.threshold.fetch.warn: 1s
+index.search.slowlog.threshold.fetch.info: 800ms
+index.indexing.slowlog.threshold.index.warn: 10s
+index.indexing.slowlog.threshold.index.info: 5s
+
+# Circuit breaker settings
+indices.breaker.total.use_real_memory: true
+indices.breaker.total.limit: 70%
+
+# Watermark settings for disk
+cluster.routing.allocation.disk.threshold_enabled: true
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+
+# ILM (Index Lifecycle Management) enabled
+xpack.ilm.enabled: true
+
+# Monitoring
+xpack.monitoring.collection.enabled: true
+xpack.monitoring.collection.interval: 30s

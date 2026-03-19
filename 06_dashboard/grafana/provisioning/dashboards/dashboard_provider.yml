@@ -1,0 +1,17 @@
+# =============================================================================
+# RubyGuardian - Grafana Dashboard Provider Configuration
+# =============================================================================
+# Auto-provisions dashboards from JSON files on disk
+
+apiVersion: 1
+
+providers:
+  - name: RubyGuardian Dashboards
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false

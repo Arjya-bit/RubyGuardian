@@ -1,0 +1,85 @@
+# =============================================================================
+# RubyGuardian - Attacker Simulation Image
+# =============================================================================
+# PURPOSE: Controlled red-team container for executing attack simulations
+# against the RubyGuardian detection pipeline.
+#
+# WARNING: This image contains offensive security tooling and must NEVER be
+# deployed outside of isolated research networks.
+#
+# Build:
+#   docker build -f Dockerfile.attacker -t rubyguardian/attacker:latest .
+# =============================================================================
+
+FROM ruby:3.2-slim-bookworm
+
+LABEL maintainer="RubyGuardian Project <security@rubyguardian.dev>"
+LABEL org.opencontainers.image.title="RubyGuardian Attacker Simulation"
+LABEL org.opencontainers.image.description="Red-team simulation container - RESEARCH USE ONLY"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL security.classification="RESTRICTED"
+LABEL security.purpose="research-only"
+
+# ---- System dependencies ----------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    libreadline-dev \
+    libyaml-dev \
+    git \
+    curl \
+    wget \
+    nmap \
+    netcat-openbsd \
+    socat \
+    dnsutils \
+    iproute2 \
+    net-tools \
+    tcpdump \
+    procps \
+    strace \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Offensive Ruby gems ----------------------------------------------------
+RUN gem install --no-document \
+    fiddle \
+    ffi \
+    httparty \
+    nokogiri \
+    openssl \
+    base64 \
+    json \
+    webrick \
+    rack \
+    sinatra
+
+# ---- Application directory ---------------------------------------------------
+WORKDIR /opt/rubyguardian
+
+COPY Gemfile Gemfile.lock* ./
+RUN bundle install --jobs=$(nproc) --retry=3 || true
+
+COPY . .
+
+# ---- Attacker user (non-root for realistic simulation) -----------------------
+RUN groupadd -r attacker && useradd -r -g attacker -m -s /bin/bash attacker \
+    && chown -R attacker:attacker /opt/rubyguardian
+
+USER attacker
+
+# ---- Environment -------------------------------------------------------------
+ENV RUBY_GUARDIAN_COMPONENT=attacker \
+    RUBY_GUARDIAN_LOG_LEVEL=debug \
+    RUBY_GUARDIAN_C2_HOST=attacker-c2 \
+    RUBY_GUARDIAN_C2_PORT=4443 \
+    RUBY_GUARDIAN_TARGET_HOST=target \
+    RUBY_GUARDIAN_TARGET_PORT=9292
+
+# ---- Entrypoint --------------------------------------------------------------
+# Default: interactive shell for manual attack execution.
+# Override CMD to run automated attack scenarios.
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["echo '=== RubyGuardian Attacker Container ===' && echo 'Run attack modules from 01_attack_framework/' && /bin/bash"]

@@ -1,0 +1,260 @@
+# =============================================================================
+# RubyGuardian - Deployment Workflow
+# =============================================================================
+# Deploys RubyGuardian to staging or production Kubernetes clusters.
+# Triggered manually via workflow_dispatch or automatically on tagged releases.
+# =============================================================================
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: "Image tag to deploy (e.g., v1.2.3 or sha-abc1234)"
+        required: true
+        type: string
+      components:
+        description: "Components to deploy (comma-separated, or 'all')"
+        required: false
+        default: "all"
+        type: string
+      dry_run:
+        description: "Dry run (diff only, no apply)"
+        required: false
+        default: true
+        type: boolean
+
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/rubyguardian
+  KUBE_NAMESPACE: rubyguardian
+
+jobs:
+  # ─── Prepare ──────────────────────────────────────────────────────────
+  prepare:
+    name: "Prepare deployment"
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      version: ${{ steps.resolve.outputs.version }}
+      components: ${{ steps.resolve.outputs.components }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
+    steps:
+      - name: Resolve parameters
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+            echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "components=all" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "components=${{ inputs.components }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Display plan
+        run: |
+          echo "## Deployment Plan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ steps.resolve.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.resolve.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Components:** ${{ steps.resolve.outputs.components }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry run:** ${{ steps.resolve.outputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+
+  # ─── Validate ─────────────────────────────────────────────────────────
+  validate:
+    name: "Validate images exist"
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check image tags
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          COMPONENTS=(detection-agent ml-classifier honeypot-rails honeypot-gems web-ui)
+
+          for component in "${COMPONENTS[@]}"; do
+            IMAGE="${REGISTRY}/${IMAGE_PREFIX}/${component}:${VERSION}"
+            echo "Checking ${IMAGE}..."
+            if docker manifest inspect "${IMAGE}" > /dev/null 2>&1; then
+              echo "  Found."
+            else
+              echo "  WARNING: Image not found: ${IMAGE}"
+              echo "  The deployment script will fall back to :latest"
+            fi
+          done
+
+  # ─── Deploy ───────────────────────────────────────────────────────────
+  deploy:
+    name: "Deploy to ${{ needs.prepare.outputs.environment }}"
+    runs-on: ubuntu-latest
+    needs: [prepare, validate]
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+      url: ${{ steps.deploy-url.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.28.0"
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connectivity
+        run: kubectl cluster-info && kubectl get ns ${{ env.KUBE_NAMESPACE }} || true
+
+      - name: Apply namespace and base resources
+        if: needs.prepare.outputs.dry_run == 'false'
+        run: |
+          kubectl apply -f 07_infrastructure/kubernetes/namespace.yml
+
+      - name: Apply ConfigMaps
+        run: |
+          CMD="kubectl apply -f 07_infrastructure/kubernetes/configmaps/"
+          if [ "${{ needs.prepare.outputs.dry_run }}" = "true" ]; then
+            CMD="kubectl diff -f 07_infrastructure/kubernetes/configmaps/"
+          fi
+          $CMD || true
+
+      - name: Update image tags in manifests
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          DEPLOY_DIR="07_infrastructure/kubernetes/deployments"
+
+          for manifest in "${DEPLOY_DIR}"/*.yml; do
+            sed -i "s|rubyguardian/\([^:]*\):[^ ]*|rubyguardian/\1:${VERSION}|g" "$manifest"
+          done
+
+          echo "Updated manifests:"
+          grep -r "image:" "${DEPLOY_DIR}/" || true
+
+      - name: Deploy workloads
+        run: |
+          COMPONENTS="${{ needs.prepare.outputs.components }}"
+          DEPLOY_DIR="07_infrastructure/kubernetes/deployments"
+          DRY_RUN="${{ needs.prepare.outputs.dry_run }}"
+
+          if [ "$COMPONENTS" = "all" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              kubectl diff -f "${DEPLOY_DIR}/" || true
+            else
+              kubectl apply -f "${DEPLOY_DIR}/"
+            fi
+          else
+            IFS=',' read -ra COMP_ARRAY <<< "$COMPONENTS"
+            for comp in "${COMP_ARRAY[@]}"; do
+              comp=$(echo "$comp" | xargs)
+              MANIFEST="${DEPLOY_DIR}/${comp}.yml"
+              if [ -f "$MANIFEST" ]; then
+                if [ "$DRY_RUN" = "true" ]; then
+                  kubectl diff -f "$MANIFEST" || true
+                else
+                  kubectl apply -f "$MANIFEST"
+                fi
+              else
+                echo "WARNING: Manifest not found: ${MANIFEST}"
+              fi
+            done
+          fi
+
+      - name: Apply services
+        run: |
+          if [ "${{ needs.prepare.outputs.dry_run }}" = "true" ]; then
+            kubectl diff -f 07_infrastructure/kubernetes/services/ || true
+          else
+            kubectl apply -f 07_infrastructure/kubernetes/services/
+          fi
+
+      - name: Wait for rollout
+        if: needs.prepare.outputs.dry_run == 'false'
+        run: |
+          echo "Waiting for deployments to become ready..."
+          for deploy in $(kubectl get deploy -n ${{ env.KUBE_NAMESPACE }} -o name 2>/dev/null); do
+            echo "  Waiting for ${deploy}..."
+            kubectl rollout status "${deploy}" \
+              -n ${{ env.KUBE_NAMESPACE }} \
+              --timeout=300s || echo "  WARNING: ${deploy} did not become ready"
+          done
+
+          echo ""
+          echo "Pod status:"
+          kubectl get pods -n ${{ env.KUBE_NAMESPACE }} -o wide
+
+      - name: Smoke test
+        if: needs.prepare.outputs.dry_run == 'false'
+        run: |
+          echo "Running smoke tests..."
+
+          # Check Elasticsearch
+          ES_POD=$(kubectl get pod -n ${{ env.KUBE_NAMESPACE }} -l app.kubernetes.io/name=elasticsearch -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          if [ -n "$ES_POD" ]; then
+            kubectl exec -n ${{ env.KUBE_NAMESPACE }} "$ES_POD" -c elasticsearch -- \
+              curl -sf http://localhost:9200/_cluster/health && echo "  Elasticsearch: OK" || echo "  Elasticsearch: FAIL"
+          fi
+
+          # Check ML Classifier
+          ML_POD=$(kubectl get pod -n ${{ env.KUBE_NAMESPACE }} -l app.kubernetes.io/name=ml-classifier -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          if [ -n "$ML_POD" ]; then
+            kubectl exec -n ${{ env.KUBE_NAMESPACE }} "$ML_POD" -c ml-classifier -- \
+              curl -sf http://localhost:8000/health && echo "  ML Classifier: OK" || echo "  ML Classifier: FAIL"
+          fi
+
+      - name: Set deployment URL
+        id: deploy-url
+        if: needs.prepare.outputs.dry_run == 'false'
+        run: |
+          NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "localhost")
+          echo "url=http://${NODE_IP}:30173" >> "$GITHUB_OUTPUT"
+
+  # ─── Post-deploy ─────────────────────────────────────────────────────
+  notify:
+    name: "Notify"
+    runs-on: ubuntu-latest
+    if: always() && needs.prepare.outputs.dry_run == 'false'
+    needs: [prepare, deploy]
+    steps:
+      - name: Send notification
+        run: |
+          STATUS="${{ needs.deploy.result }}"
+          ENV="${{ needs.prepare.outputs.environment }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          echo "## Deployment Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${STATUS}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${ENV}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY

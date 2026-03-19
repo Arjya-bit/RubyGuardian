@@ -1,0 +1,286 @@
+# =============================================================================
+# RubyGuardian - Security Scanning Workflow
+# =============================================================================
+# Runs comprehensive security scans on every push to main/develop and on
+# a weekly schedule.  Covers dependency auditing, SAST, container image
+# scanning, and secret detection.
+# =============================================================================
+
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly scan every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  RUBY_VERSION: "3.2"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ─── Dependency Audit ─────────────────────────────────────────────────
+  ruby-audit:
+    name: "Audit: Ruby gems (bundler-audit)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+
+      - name: Update advisory database
+        run: bundle exec bundle-audit update
+
+      - name: Run bundler-audit
+        run: bundle exec bundle-audit check --verbose
+
+      - name: Run Brakeman (if Rails components exist)
+        run: |
+          if [ -f "05_honeypot/decoy_apps/fake_rails_app/Gemfile" ]; then
+            gem install brakeman
+            brakeman 05_honeypot/decoy_apps/fake_rails_app/ \
+              --format sarif \
+              --output brakeman-results.sarif \
+              --no-pager || true
+          fi
+        continue-on-error: true
+
+      - name: Upload Brakeman SARIF
+        if: hashFiles('brakeman-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: brakeman-results.sarif
+          category: brakeman
+
+  python-audit:
+    name: "Audit: Python packages (Safety + pip-audit)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install safety pip-audit
+
+      - name: Run Safety
+        run: safety check --full-report --output json > safety-report.json || true
+        continue-on-error: true
+
+      - name: Run pip-audit
+        run: pip-audit --format=json --output=pip-audit-report.json || true
+        continue-on-error: true
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-audit-reports
+          path: |
+            safety-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  npm-audit:
+    name: "Audit: npm packages"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: 06_dashboard/web_ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: 06_dashboard/web_ui
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: 06_dashboard/web_ui
+        run: npm audit --json > ../../npm-audit-report.json || true
+        continue-on-error: true
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+          retention-days: 30
+
+  # ─── SAST ─────────────────────────────────────────────────────────────
+  codeql:
+    name: "SAST: CodeQL"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: [ruby, python, javascript]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  semgrep:
+    name: "SAST: Semgrep"
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config=auto \
+            --config=p/ruby \
+            --config=p/python \
+            --config=p/javascript \
+            --sarif \
+            --output=semgrep-results.sarif \
+            --error \
+            . || true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
+  # ─── Container Scanning ──────────────────────────────────────────────
+  trivy-scan:
+    name: "Container: Trivy scan"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dockerfile:
+          - path: 07_infrastructure/docker/base/Dockerfile.ruby
+            name: ruby-base
+          - path: 07_infrastructure/docker/base/Dockerfile.python
+            name: python-base
+          - path: 07_infrastructure/docker/base/Dockerfile.attacker
+            name: attacker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -f ${{ matrix.dockerfile.path }} \
+            -t scan-target:${{ matrix.dockerfile.name }} .
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "scan-target:${{ matrix.dockerfile.name }}"
+          format: sarif
+          output: "trivy-${{ matrix.dockerfile.name }}.sarif"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-${{ matrix.dockerfile.name }}.sarif"
+          category: "trivy-${{ matrix.dockerfile.name }}"
+
+  # ─── Secret Detection ────────────────────────────────────────────────
+  secret-scan:
+    name: "Secrets: Gitleaks"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── IaC Scanning ────────────────────────────────────────────────────
+  checkov:
+    name: "IaC: Checkov"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: 07_infrastructure/
+          framework: kubernetes,dockerfile
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+
+  # ─── Summary ──────────────────────────────────────────────────────────
+  security-summary:
+    name: "Security Summary"
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [ruby-audit, python-audit, npm-audit, codeql, semgrep, trivy-scan, secret-scan, checkov]
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby Audit | ${{ needs.ruby-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Audit | ${{ needs.python-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| npm Audit | ${{ needs.npm-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL | ${{ needs.codeql.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep | ${{ needs.semgrep.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy | ${{ needs.trivy-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov | ${{ needs.checkov.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,38 @@
+# =============================================================================
+# RubyGuardian - Logstash Pipeline Configuration
+# =============================================================================
+# Defines multiple pipelines for different data sources
+
+- pipeline.id: ruby-guardian-agent
+  path.config: "/usr/share/logstash/pipeline/01_input_agent.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 250
+  queue.type: persisted
+
+- pipeline.id: ruby-guardian-honeypot
+  path.config: "/usr/share/logstash/pipeline/02_input_honeypot.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 125
+  queue.type: persisted
+
+- pipeline.id: ruby-guardian-forensics
+  path.config: "/usr/share/logstash/pipeline/03_input_forensics.conf"
+  pipeline.workers: 1
+  pipeline.batch.size: 50
+  queue.type: persisted
+
+- pipeline.id: ruby-guardian-enrich
+  path.config: "/usr/share/logstash/pipeline/04_filter_enrich.conf"
+  pipeline.workers: 2
+  queue.type: persisted
+
+- pipeline.id: ruby-guardian-normalize
+  path.config: "/usr/share/logstash/pipeline/05_filter_normalize.conf"
+  pipeline.workers: 2
+  queue.type: persisted
+
+- pipeline.id: ruby-guardian-output
+  path.config: "/usr/share/logstash/pipeline/06_output_elasticsearch.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 500
+  queue.type: persisted

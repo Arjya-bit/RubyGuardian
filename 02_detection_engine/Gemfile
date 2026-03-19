@@ -1,0 +1,58 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ruby ">= 3.1.0"
+
+# Core
+gem "concurrent-ruby", "~> 1.2"
+gem "dry-configurable", "~> 1.0"
+gem "dry-struct", "~> 1.6"
+gem "dry-validation", "~> 1.10"
+gem "zeitwerk", "~> 2.6"
+
+# Process & System Monitoring
+gem "sys-proctable", "~> 1.3"
+gem "ffi", "~> 1.16"
+gem "rb-inotify", "~> 0.10"
+gem "fiddle", "~> 1.1"
+
+# Networking
+gem "pcap", "~> 0.8", platform: :ruby
+gem "net-http", "~> 0.4"
+
+# Logging & Serialization
+gem "oj", "~> 3.16"
+gem "semantic_logger", "~> 4.15"
+gem "syslog-logger", "~> 2.0"
+
+# Alerting Channels
+gem "mail", "~> 2.8"
+gem "slack-notifier", "~> 2.4"
+gem "elasticsearch", "~> 8.11"
+gem "faraday", "~> 2.8"
+
+# Daemon Management
+gem "daemons", "~> 1.4"
+gem "rufus-scheduler", "~> 3.9"
+
+# Metrics
+gem "prometheus-client", "~> 4.2"
+
+group :development, :test do
+  gem "rspec", "~> 3.13"
+  gem "rspec-mocks", "~> 3.13"
+  gem "webmock", "~> 3.19"
+  gem "factory_bot", "~> 6.4"
+  gem "simplecov", "~> 0.22"
+  gem "rubocop", "~> 1.59"
+  gem "rubocop-rspec", "~> 2.25"
+  gem "rake", "~> 13.1"
+  gem "rake-compiler", "~> 1.2"
+  gem "pry", "~> 0.14"
+  gem "pry-byebug", "~> 3.10"
+end
+
+group :test do
+  gem "timecop", "~> 0.9"
+end

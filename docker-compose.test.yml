@@ -1,0 +1,57 @@
+version: '3.8'
+
+# Testing overrides - runs complete test suite in containers
+
+services:
+  test-ruby:
+    build:
+      context: .
+      dockerfile: 07_infrastructure/docker/base/Dockerfile.ruby
+    container_name: rg-test-ruby
+    command: bundle exec rspec --format documentation
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - test-net
+
+  test-python:
+    build:
+      context: .
+      dockerfile: 07_infrastructure/docker/base/Dockerfile.python
+    container_name: rg-test-python
+    command: python -m pytest 03_ml_classifier/tests/ -v --tb=short
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - test-net
+
+  test-integration:
+    build:
+      context: .
+      dockerfile: 07_infrastructure/docker/base/Dockerfile.ruby
+    container_name: rg-test-integration
+    command: bundle exec rspec 09_testing/integration/ --format documentation
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - test-net
+    depends_on:
+      - test-elasticsearch
+
+  test-elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: rg-test-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+    networks:
+      - test-net
+
+networks:
+  test-net:
+    driver: bridge
+    internal: true

@@ -1,0 +1,301 @@
+{
+  "profile_name": "ruby_3_3_linux",
+  "ruby_version": "3.3.x",
+  "platform": "linux",
+  "architecture": "x86_64",
+  "description": "Volatility profile for Ruby 3.3.x on Linux x86_64. Updated for RJIT compiler, new object shapes, and variable-width allocation changes in Ruby 3.3.",
+  "abi": {
+    "pointer_size": 8,
+    "alignment": 8,
+    "endianness": "little"
+  },
+  "changes_from_3_2": [
+    "Variable Width Allocation (VWA) fully enabled - RVALUE sizes may vary",
+    "Object shapes system replaces iv_index_tbl for instance variable layout",
+    "RJIT replaces MJIT as the JIT compiler",
+    "New YJIT metadata structures for compiled code regions",
+    "Prism parser AST nodes may appear in memory alongside legacy parse.y nodes"
+  ],
+  "structures": {
+    "RBasic": {
+      "size": 16,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "VALUE" },
+        "klass": { "offset": 8, "size": 8, "type": "VALUE" }
+      }
+    },
+    "RObject": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "numiv": { "offset": 16, "size": 4, "type": "uint32_t" },
+            "ivptr": { "offset": 24, "size": 8, "type": "VALUE*" },
+            "shape_id": { "offset": 32, "size": 4, "type": "shape_id_t" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      },
+      "comment": "In Ruby 3.3, shape_id replaces iv_index_tbl for ivar layout"
+    },
+    "RString": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long" },
+            "ptr": { "offset": 24, "size": 8, "type": "char*" },
+            "aux": {
+              "capa": { "offset": 32, "size": 8, "type": "long" }
+            }
+          },
+          "embed": {
+            "len_and_terminator": { "offset": 16, "size": 8, "type": "long" },
+            "ary": { "offset": 24, "size": 16, "type": "char[]" }
+          }
+        }
+      },
+      "flags": {
+        "STR_NOEMBED": "0x2000",
+        "STR_SHARED": "0x4000",
+        "STR_FROZEN": "0x8000",
+        "EMBED_LEN_MASK": "0x1f0000",
+        "EMBED_LEN_SHIFT": 16
+      },
+      "vwa_note": "With VWA, embedded strings may use more than the standard 24 bytes for inline storage"
+    },
+    "RArray": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long" },
+            "aux": {
+              "capa": { "offset": 24, "size": 8, "type": "long" }
+            },
+            "ptr": { "offset": 32, "size": 8, "type": "VALUE*" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      },
+      "flags": {
+        "ARY_EMBED_FLAG": "0x2000",
+        "ARY_EMBED_LEN_MASK": "0x60000",
+        "ARY_EMBED_LEN_SHIFT": 17
+      }
+    },
+    "RHash": {
+      "size": 56,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "ifnone": { "offset": 16, "size": 8, "type": "VALUE" },
+        "ntbl": { "offset": 24, "size": 8, "type": "st_table*" },
+        "iter_lev": { "offset": 32, "size": 4, "type": "int" }
+      }
+    },
+    "RClass": {
+      "size": 64,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "super": { "offset": 16, "size": 8, "type": "VALUE" },
+        "ptr": { "offset": 24, "size": 8, "type": "rb_classext_t*" },
+        "class_serial": { "offset": 32, "size": 8, "type": "uint64_t" }
+      }
+    },
+    "rb_shape_t": {
+      "size": 48,
+      "fields": {
+        "edges": { "offset": 0, "size": 8, "type": "void*" },
+        "edge_name": { "offset": 8, "size": 8, "type": "ID" },
+        "next_iv_index": { "offset": 16, "size": 4, "type": "attr_index_t" },
+        "capacity": { "offset": 20, "size": 4, "type": "uint32_t" },
+        "type": { "offset": 24, "size": 1, "type": "uint8_t" },
+        "parent_id": { "offset": 28, "size": 4, "type": "shape_id_t" },
+        "ancestor_index": { "offset": 32, "size": 8, "type": "redblack_node_t*" }
+      },
+      "comment": "New in Ruby 3.3 - object shapes system for instance variable optimization"
+    },
+    "rb_iseq_t": {
+      "size": 200,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "VALUE" },
+        "body": { "offset": 8, "size": 8, "type": "rb_iseq_constant_body*" }
+      }
+    },
+    "rb_iseq_constant_body": {
+      "size": 320,
+      "fields": {
+        "type": { "offset": 0, "size": 4, "type": "enum iseq_type" },
+        "iseq_size": { "offset": 4, "size": 4, "type": "unsigned int" },
+        "iseq_encoded": { "offset": 8, "size": 8, "type": "VALUE*" },
+        "param": {
+          "flags": { "offset": 16, "size": 4, "type": "uint32_t" },
+          "lead_num": { "offset": 20, "size": 4, "type": "int" },
+          "opt_num": { "offset": 24, "size": 4, "type": "int" }
+        },
+        "location": {
+          "pathobj": { "offset": 48, "size": 8, "type": "VALUE" },
+          "base_label": { "offset": 56, "size": 8, "type": "VALUE" },
+          "label": { "offset": 64, "size": 8, "type": "VALUE" },
+          "first_lineno": { "offset": 72, "size": 4, "type": "int" },
+          "node_id": { "offset": 76, "size": 4, "type": "int" }
+        },
+        "local_table_size": { "offset": 80, "size": 4, "type": "unsigned int" },
+        "local_table": { "offset": 88, "size": 8, "type": "ID*" },
+        "insns_info": { "offset": 96, "size": 8, "type": "void*" },
+        "insns_info_size": { "offset": 104, "size": 4, "type": "unsigned int" },
+        "yjit_payload": { "offset": 112, "size": 8, "type": "void*", "comment": "YJIT compiled code metadata" }
+      }
+    },
+    "rb_vm_t": {
+      "size": 2560,
+      "fields": {
+        "running_thread": { "offset": 0, "size": 8, "type": "rb_thread_t*" },
+        "ractor": {
+          "cnt": { "offset": 16, "size": 4, "type": "int" }
+        },
+        "objspace": { "offset": 48, "size": 8, "type": "rb_objspace_t*" },
+        "loading_table": { "offset": 56, "size": 8, "type": "st_table*" },
+        "frozen_strings": { "offset": 64, "size": 8, "type": "st_table*" }
+      },
+      "comment": "Size increased in 3.3 due to additional RJIT and shape-related fields"
+    },
+    "rb_thread_t": {
+      "size": 1088,
+      "fields": {
+        "self": { "offset": 0, "size": 8, "type": "VALUE" },
+        "vm": { "offset": 8, "size": 8, "type": "rb_vm_t*" },
+        "cfp": { "offset": 16, "size": 8, "type": "rb_control_frame_t*" },
+        "ec": { "offset": 24, "size": 8, "type": "rb_execution_context_t*" },
+        "status": { "offset": 32, "size": 4, "type": "int" },
+        "priority": { "offset": 36, "size": 4, "type": "int" },
+        "native_thread_id": { "offset": 40, "size": 8, "type": "pthread_t" }
+      }
+    },
+    "rb_control_frame_t": {
+      "size": 48,
+      "fields": {
+        "pc": { "offset": 0, "size": 8, "type": "VALUE*" },
+        "sp": { "offset": 8, "size": 8, "type": "VALUE*" },
+        "iseq": { "offset": 16, "size": 8, "type": "rb_iseq_t*" },
+        "self": { "offset": 24, "size": 8, "type": "VALUE" },
+        "ep": { "offset": 32, "size": 8, "type": "VALUE*" },
+        "block_code": { "offset": 40, "size": 8, "type": "void*" }
+      }
+    },
+    "rb_objspace_t": {
+      "size": 4096,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "unsigned long" },
+        "heap_pages": {
+          "sorted": { "offset": 16, "size": 8, "type": "rb_heap_page_t**" },
+          "sorted_length": { "offset": 24, "size": 4, "type": "int" },
+          "allocated_pages": { "offset": 28, "size": 4, "type": "int" }
+        },
+        "total_allocated_objects": { "offset": 48, "size": 8, "type": "size_t" },
+        "total_freed_objects": { "offset": 56, "size": 8, "type": "size_t" },
+        "malloc_increase": { "offset": 64, "size": 8, "type": "size_t" }
+      }
+    },
+    "rb_heap_page_t": {
+      "size": 80,
+      "fields": {
+        "flags": { "offset": 0, "size": 2, "type": "unsigned short" },
+        "total_slots": { "offset": 2, "size": 2, "type": "unsigned short" },
+        "free_slots": { "offset": 4, "size": 2, "type": "unsigned short" },
+        "final_slots": { "offset": 6, "size": 2, "type": "unsigned short" },
+        "start": { "offset": 8, "size": 8, "type": "RVALUE*" },
+        "freelist": { "offset": 16, "size": 8, "type": "RVALUE*" },
+        "prev": { "offset": 24, "size": 8, "type": "rb_heap_page_t*" },
+        "next": { "offset": 32, "size": 8, "type": "rb_heap_page_t*" },
+        "body": { "offset": 40, "size": 8, "type": "rb_heap_page_body_t*" },
+        "size_pool_idx": { "offset": 48, "size": 4, "type": "int", "comment": "VWA size pool index" }
+      },
+      "constants": {
+        "HEAP_PAGE_OBJ_LIMIT": 409,
+        "HEAP_PAGE_SIZE": 16384,
+        "RVALUE_SIZE": 40,
+        "SIZE_POOL_COUNT": 5,
+        "SIZE_POOL_SIZES": [40, 80, 160, 320, 640]
+      },
+      "comment": "Ruby 3.3 uses multiple size pools for variable-width allocation"
+    },
+    "yjit_code_region": {
+      "size": 32,
+      "fields": {
+        "start_addr": { "offset": 0, "size": 8, "type": "uint8_t*" },
+        "end_addr": { "offset": 8, "size": 8, "type": "uint8_t*" },
+        "mapped_size": { "offset": 16, "size": 8, "type": "size_t" },
+        "used_size": { "offset": 24, "size": 8, "type": "size_t" }
+      },
+      "comment": "YJIT compiled code region - may contain JIT-compiled native x86_64 code"
+    }
+  },
+  "symbols": {
+    "ruby_current_vm_ptr": {
+      "description": "Global pointer to the current Ruby VM instance",
+      "type": "rb_vm_t*"
+    },
+    "ruby_current_execution_context_ptr": {
+      "description": "Thread-local pointer to current execution context",
+      "type": "rb_execution_context_t*"
+    },
+    "rb_shape_tree": {
+      "description": "Global shape tree root for object shape lookups",
+      "type": "rb_shape_t*"
+    }
+  },
+  "instructions": {
+    "comment": "Ruby 3.3 YARV instruction opcodes - same base set as 3.2 with additions",
+    "opcodes": {
+      "0": "nop",
+      "1": "getlocal",
+      "2": "setlocal",
+      "3": "getblockparam",
+      "4": "setblockparam",
+      "5": "getblockparamproxy",
+      "6": "getspecial",
+      "7": "setspecial",
+      "8": "getinstancevariable",
+      "9": "setinstancevariable",
+      "10": "getclassvariable",
+      "11": "setclassvariable",
+      "12": "opt_getconstant_path",
+      "13": "getconstant",
+      "14": "setconstant",
+      "15": "getglobal",
+      "16": "setglobal",
+      "17": "putnil",
+      "18": "putself",
+      "19": "putobject",
+      "20": "putspecialobject",
+      "21": "putstring",
+      "22": "concatstrings",
+      "50": "send",
+      "51": "opt_send_without_block",
+      "59": "leave",
+      "60": "throw",
+      "61": "jump",
+      "62": "branchif",
+      "63": "branchunless",
+      "64": "branchnil",
+      "74": "opt_plus",
+      "75": "opt_minus",
+      "76": "opt_mult",
+      "77": "opt_div",
+      "79": "opt_eq",
+      "80": "opt_neq",
+      "81": "opt_lt",
+      "82": "opt_le",
+      "83": "opt_gt",
+      "84": "opt_ge"
+    }
+  }
+}

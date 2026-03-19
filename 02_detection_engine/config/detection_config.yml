@@ -1,0 +1,247 @@
+# RubyGuardian Detection Engine - Main Configuration
+# ===================================================
+
+engine:
+  # Environment: development, staging, production
+  environment: production
+
+  # Unique identifier for this agent instance
+  agent_id: "ruby-guardian-<%= Socket.gethostname %>"
+
+  # Log level: debug, info, warn, error, fatal
+  log_level: info
+  log_file: /var/log/ruby-guardian/detection_engine.log
+  log_rotation: daily
+  log_max_files: 30
+
+  # PID file location
+  pid_file: /var/run/ruby-guardian-agent.pid
+
+  # Working directory
+  working_dir: /opt/ruby-guardian
+
+  # Event queue settings
+  event_queue_size: 10000
+  event_batch_size: 100
+  event_flush_interval_ms: 500
+
+monitoring:
+  # Process monitoring
+  process:
+    enabled: true
+    interval_ms: 1000
+    # Target Ruby processes (regex patterns)
+    target_patterns:
+      - "ruby"
+      - "bundle exec"
+      - "rails"
+      - "puma"
+      - "sidekiq"
+      - "unicorn"
+    # Watch for these suspicious behaviors
+    watch_fork: true
+    watch_exec: true
+    watch_spawn: true
+    watch_ptrace: true
+    max_tracked_processes: 500
+
+  # System call tracing
+  syscall:
+    enabled: true
+    # Method: ebpf (preferred), ptrace (fallback), audit (auditd integration)
+    method: ebpf
+    fallback_method: ptrace
+    # Syscalls to trace
+    traced_syscalls:
+      - execve
+      - fork
+      - clone
+      - mmap
+      - mprotect
+      - ptrace
+      - memfd_create
+      - process_vm_readv
+      - process_vm_writev
+      - connect
+      - sendto
+      - recvfrom
+      - open
+      - openat
+      - unlink
+    # Sequence detection window (ms)
+    sequence_window_ms: 5000
+
+  # Memory inspection
+  memory:
+    enabled: true
+    interval_ms: 5000
+    # Scan for RWX (read-write-execute) regions
+    detect_rwx_regions: true
+    # Scan for shellcode patterns
+    detect_shellcode_patterns: true
+    # Detect anonymous executable mappings
+    detect_anon_exec: true
+    # Maximum memory regions to scan per process
+    max_regions_per_scan: 1000
+    # Known safe RWX regions (JIT compilers, etc.)
+    rwx_whitelist:
+      - "/usr/lib/ruby/*/libruby.so"
+      - "/tmp/ruby-jit-*"
+
+  # Network monitoring
+  network:
+    enabled: true
+    interval_ms: 2000
+    # Detect beaconing patterns
+    detect_beaconing: true
+    beacon_min_intervals: 5
+    beacon_jitter_tolerance: 0.15
+    # Detect data exfiltration
+    detect_exfiltration: true
+    exfil_threshold_bytes: 1048576  # 1MB
+    exfil_window_seconds: 300
+    # DNS monitoring
+    detect_dns_tunneling: true
+    dns_query_length_threshold: 50
+    # Known safe destinations
+    safe_destinations:
+      - "rubygems.org"
+      - "bundler.io"
+      - "api.github.com"
+
+  # File system monitoring
+  filesystem:
+    enabled: true
+    # Directories to watch
+    watch_paths:
+      - /tmp
+      - /var/tmp
+      - /dev/shm
+      - /proc/self
+    # File patterns that are suspicious
+    suspicious_patterns:
+      - "*.so"
+      - "*.rb"
+      - "*.sh"
+    # Detect writes to /dev/shm or memfd
+    detect_memfd_writes: true
+    detect_shm_writes: true
+
+  # ObjectSpace scanning
+  objectspace:
+    enabled: true
+    interval_ms: 10000
+    # Detect monkey-patching of core classes
+    detect_core_class_tampering: true
+    # Detect method redefinition on security-sensitive classes
+    detect_method_redefinition: true
+    # Detect unusual object allocation patterns
+    detect_allocation_anomalies: true
+    # Classes to protect
+    protected_classes:
+      - Kernel
+      - IO
+      - File
+      - Process
+      - Socket
+      - OpenSSL::SSL::SSLContext
+      - Net::HTTP
+    # Methods to protect from redefinition
+    protected_methods:
+      Kernel:
+        - system
+        - exec
+        - spawn
+        - open
+        - eval
+        - require
+        - load
+      IO:
+        - popen
+        - read
+        - write
+      File:
+        - open
+        - read
+        - write
+        - delete
+
+detection:
+  # Signature files to load
+  signature_dirs:
+    - config/signatures
+    - config/signatures/custom
+
+  # Detection sensitivity: low, medium, high, paranoid
+  sensitivity: high
+
+  # Correlation settings
+  correlation:
+    enabled: true
+    # Time window for correlating related events
+    window_seconds: 60
+    # Minimum events to trigger correlation alert
+    min_events: 3
+
+  # Threshold settings
+  thresholds:
+    # Max eval/instance_eval calls per minute per process
+    eval_calls_per_minute: 10
+    # Max ObjectSpace.each_object calls per minute
+    objectspace_scans_per_minute: 5
+    # Max outbound connections per minute
+    outbound_connections_per_minute: 30
+    # Max file operations in temp dirs per minute
+    temp_file_ops_per_minute: 20
+
+  # False positive reduction
+  false_positive:
+    enabled: true
+    # Known development tools to whitelist
+    whitelisted_tools:
+      - "irb"
+      - "pry"
+      - "byebug"
+      - "rspec"
+      - "rubocop"
+    # Cooldown period after alert (seconds)
+    alert_cooldown_seconds: 300
+    # Suppress duplicate alerts within window
+    dedup_window_seconds: 60
+
+alerting:
+  # Alert severity levels: info, low, medium, high, critical
+  min_severity: medium
+
+  # Rate limiting
+  max_alerts_per_minute: 30
+  max_alerts_per_hour: 500
+
+  # Channels
+  channels:
+    syslog:
+      enabled: true
+      config_file: config/alerting/syslog_config.yml
+    email:
+      enabled: false
+      config_file: config/alerting/email_config.yml
+    slack:
+      enabled: false
+      config_file: config/alerting/slack_webhook.yml
+    elasticsearch:
+      enabled: false
+      url: "http://localhost:9200"
+      index_prefix: "ruby-guardian-alerts"
+
+  # Default formatter
+  default_format: json
+
+metrics:
+  enabled: true
+  # Prometheus metrics endpoint
+  prometheus:
+    enabled: true
+    port: 9394
+    path: /metrics
+  # Internal metrics flush interval
+  flush_interval_seconds: 30

@@ -1,0 +1,222 @@
+version: '3.8'
+
+services:
+  # ─── Attack Framework (Isolated) ──────────────────────────────────────────
+  attacker:
+    build:
+      context: .
+      dockerfile: 07_infrastructure/docker/base/Dockerfile.attacker
+    container_name: rg-attacker
+    networks:
+      - attack-net
+    volumes:
+      - ./01_attack_framework:/app/attack_framework
+      - attack-data:/data
+    environment:
+      - RUBY_ENV=sandbox
+      - C2_SERVER=c2-server
+      - C2_PORT=4444
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # ─── C2 Server ────────────────────────────────────────────────────────────
+  c2-server:
+    build:
+      context: ./01_attack_framework/1b_cicd_poisoning/c2_server
+      dockerfile: Dockerfile
+    container_name: rg-c2-server
+    networks:
+      - attack-net
+    ports:
+      - "127.0.0.1:4444:4444"
+    volumes:
+      - c2-data:/data
+    environment:
+      - RACK_ENV=development
+      - DATABASE_PATH=/data/c2.db
+
+  # ─── Detection Agent ─────────────────────────────────────────────────────
+  detection-agent:
+    build:
+      context: ./02_detection_engine/agent
+      dockerfile: Dockerfile
+    container_name: rg-detection-agent
+    networks:
+      - monitor-net
+    volumes:
+      - /proc:/host/proc:ro
+      - ./02_detection_engine:/app/detection_engine
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ALERT_LEVEL=medium
+    privileged: true
+    pid: host
+
+  # ─── ML Classifier API ───────────────────────────────────────────────────
+  classifier-api:
+    build:
+      context: ./03_ml_classifier/api
+      dockerfile: Dockerfile
+    container_name: rg-classifier-api
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./03_ml_classifier:/app/ml_classifier
+      - model-data:/models
+    environment:
+      - MODEL_PATH=/models
+      - API_KEY=${CLASSIFIER_API_KEY:-dev-key}
+
+  # ─── Honeypot: Fake Rails App ────────────────────────────────────────────
+  honeypot-rails:
+    build:
+      context: ./05_honeypot/decoy_apps/fake_rails_app
+      dockerfile: Dockerfile
+    container_name: rg-honeypot-rails
+    networks:
+      - honeypot-net
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - honeypot-data:/data/captures
+
+  # ─── Honeypot: Fake Gem Server ───────────────────────────────────────────
+  honeypot-gems:
+    build:
+      context: ./05_honeypot/decoy_apps/fake_gem_server
+      dockerfile: Dockerfile
+    container_name: rg-honeypot-gems
+    networks:
+      - honeypot-net
+    ports:
+      - "127.0.0.1:9292:9292"
+    volumes:
+      - honeypot-data:/data/captures
+
+  # ─── Honeypot: Fake CI Runner ───────────────────────────────────────────
+  honeypot-ci:
+    build:
+      context: ./05_honeypot/decoy_apps/fake_ci_runner
+      dockerfile: Dockerfile
+    container_name: rg-honeypot-ci
+    networks:
+      - honeypot-net
+    volumes:
+      - honeypot-data:/data/captures
+
+  # ─── Elasticsearch ───────────────────────────────────────────────────────
+  elasticsearch:
+    build:
+      context: ./06_dashboard/elk_stack/elasticsearch
+      dockerfile: Dockerfile
+    container_name: rg-elasticsearch
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+
+  # ─── Logstash ────────────────────────────────────────────────────────────
+  logstash:
+    build:
+      context: ./06_dashboard/elk_stack/logstash
+      dockerfile: Dockerfile
+    container_name: rg-logstash
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:5044:5044"
+    volumes:
+      - ./06_dashboard/elk_stack/logstash/pipeline:/usr/share/logstash/pipeline
+    depends_on:
+      - elasticsearch
+
+  # ─── Kibana ──────────────────────────────────────────────────────────────
+  kibana:
+    build:
+      context: ./06_dashboard/elk_stack/kibana
+      dockerfile: Dockerfile
+    container_name: rg-kibana
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+
+  # ─── Grafana ─────────────────────────────────────────────────────────────
+  grafana:
+    build:
+      context: ./06_dashboard/grafana
+      dockerfile: Dockerfile
+    container_name: rg-grafana
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  # ─── React Web UI ────────────────────────────────────────────────────────
+  web-ui:
+    build:
+      context: ./06_dashboard/web_ui
+      dockerfile: Dockerfile
+    container_name: rg-web-ui
+    networks:
+      - monitor-net
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      - VITE_ES_URL=http://localhost:9200
+      - VITE_CLASSIFIER_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8080
+
+  # ─── Sandbox ─────────────────────────────────────────────────────────────
+  sandbox:
+    build:
+      context: ./05_honeypot/sandbox
+      dockerfile: Dockerfile.sandbox
+    container_name: rg-sandbox
+    networks:
+      - sandbox-net
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    tmpfs:
+      - /tmp:size=50m
+
+networks:
+  attack-net:
+    driver: bridge
+    internal: true
+  monitor-net:
+    driver: bridge
+  honeypot-net:
+    driver: bridge
+  sandbox-net:
+    driver: bridge
+    internal: true
+
+volumes:
+  es-data:
+  grafana-data:
+  attack-data:
+  c2-data:
+  model-data:
+  honeypot-data:

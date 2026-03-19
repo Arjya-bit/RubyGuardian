@@ -1,0 +1,108 @@
+name: RubyGuardian CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ruby-tests:
+    name: Ruby Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby-version: ['3.2', '3.3']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: true
+
+      - name: Install dependencies (Detection Engine)
+        run: |
+          cd 02_detection_engine
+          bundle install --jobs 4 --retry 3
+
+      - name: Install dependencies (Memory Forensics)
+        run: |
+          cd 04_memory_forensics
+          bundle install --jobs 4 --retry 3
+
+      - name: Install dependencies (Honeypot)
+        run: |
+          cd 05_honeypot
+          bundle install --jobs 4 --retry 3
+
+      - name: Run Ruby unit tests
+        run: |
+          cd 09_testing
+          find unit/ruby -name '*_spec.rb' -exec ruby -e "require 'rspec/autorun'" {} \; || true
+
+      - name: Run RuboCop lint
+        run: |
+          gem install rubocop
+          rubocop --format simple \
+            01_attack_framework/**/lib/*.rb \
+            02_detection_engine/agent/*.rb \
+            04_memory_forensics/lib/*.rb \
+            05_honeypot/**/*.rb || true
+
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          cd 03_ml_classifier
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8
+
+      - name: Lint with flake8
+        run: |
+          cd 03_ml_classifier
+          flake8 --max-line-length=120 --ignore=E501,W503 . || true
+
+      - name: Run Python unit tests
+        run: |
+          cd 09_testing/unit/python
+          python -m pytest ml_classifier/ -v --tb=short || true
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [ruby-tests, python-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build base Docker images
+        run: |
+          cd 07_infrastructure/docker/base
+          docker build -f Dockerfile.ruby -t ruby-guardian-ruby:test .
+          docker build -f Dockerfile.python -t ruby-guardian-python:test .
+
+      - name: Build detection agent image
+        run: |
+          cd 02_detection_engine
+          docker build -f agent/Dockerfile -t ruby-guardian-agent:test . || true
+
+      - name: Build ML classifier image
+        run: |
+          cd 06_dashboard/web_ui
+          docker build -t ruby-guardian-dashboard:test . || true

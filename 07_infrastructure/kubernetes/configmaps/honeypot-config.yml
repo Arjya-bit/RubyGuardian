@@ -1,0 +1,126 @@
+# =============================================================================
+# RubyGuardian - Honeypot ConfigMap
+# =============================================================================
+# Runtime configuration for the honeypot deployment.
+# Controls decoy behavior, capture settings, and telemetry shipping.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honeypot-config
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: honeypot
+    app.kubernetes.io/component: deception
+    app.kubernetes.io/part-of: rubyguardian
+data:
+  # --- General settings ---
+  honeypot_mode: "interactive"
+  log_level: "info"
+  log_format: "json"
+  capture_dir: "/data/captures"
+
+  # --- Elasticsearch ---
+  elasticsearch_url: "http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200"
+  capture_index: "rubyguardian-honeypot-captures"
+  session_index: "rubyguardian-honeypot-sessions"
+
+  # --- Fake Rails App ---
+  rails_app_name: "DevPortal"
+  rails_app_version: "7.1.2"
+  rails_simulate_vulnerabilities: "true"
+  rails_response_delay_ms: "50"
+
+  # --- Fake Gem Server ---
+  gem_server_name: "Internal Gems"
+  gem_server_simulate_packages: "150"
+  gem_typosquat_enabled: "true"
+  gem_dependency_confusion_enabled: "true"
+
+  # --- Fake CI Runner ---
+  ci_runner_name: "BuildBot"
+  ci_simulate_jobs: "true"
+  ci_expose_env_vars: "true"
+
+  # --- Capture settings ---
+  capture_config.yml: |
+    ---
+    capture:
+      # Network capture
+      network:
+        enabled: true
+        pcap_enabled: true
+        pcap_max_size_mb: 100
+        pcap_rotation_count: 5
+        capture_headers: true
+        capture_body: true
+        max_body_size_kb: 512
+
+      # Payload capture
+      payloads:
+        enabled: true
+        store_uploaded_files: true
+        max_file_size_mb: 10
+        hash_algorithms:
+          - sha256
+          - md5
+        extract_strings: true
+        min_string_length: 4
+
+      # Session tracking
+      sessions:
+        enabled: true
+        session_timeout_minutes: 30
+        track_navigation: true
+        track_timing: true
+        fingerprint_client: true
+        fingerprint_fields:
+          - user_agent
+          - accept_language
+          - accept_encoding
+          - connection
+
+      # Interaction logging
+      interactions:
+        log_all_requests: true
+        log_response_codes: true
+        log_geo_ip: true
+        geo_ip_database: "/data/GeoLite2-City.mmdb"
+
+      # Alerting thresholds
+      alerts:
+        rapid_request_threshold: 50
+        rapid_request_window_seconds: 60
+        sqli_attempt: true
+        xss_attempt: true
+        path_traversal_attempt: true
+        command_injection_attempt: true
+        suspicious_user_agents:
+          - sqlmap
+          - nikto
+          - nmap
+          - masscan
+          - gobuster
+          - dirbuster
+          - wfuzz
+
+    # Decoy credentials (intentionally fake — placed to detect credential stuffing)
+    decoy_credentials:
+      - username: admin
+        password: "P@ssw0rd123!"
+        note: "Tracks login attempts with common credentials"
+      - username: deploy
+        password: "deploy-token-2024"
+        note: "Simulates CI/CD service account"
+      - username: root
+        password: "toor"
+        note: "Classic default credential honeypot"
+
+    # Fake environment variables exposed to simulate misconfiguration
+    decoy_env_vars:
+      DATABASE_URL: "postgres://admin:fakepassword@db.internal:5432/production"
+      AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE"
+      AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      STRIPE_SECRET_KEY: "sk_test_FAKE000000000000000000"
+      GITHUB_TOKEN: "ghp_FAKE0000000000000000000000000000000"

@@ -1,0 +1,157 @@
+# =============================================================================
+# RubyGuardian - ML Classifier ConfigMap
+# =============================================================================
+# Runtime configuration for the ML classifier API deployment.
+# Includes model parameters, feature extraction settings, and
+# classification thresholds.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-config
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/component: classification
+    app.kubernetes.io/part-of: rubyguardian
+data:
+  # --- Model settings ---
+  model_path: "/models"
+  model_type: "ensemble"
+  confidence_threshold: "0.75"
+  ensemble_strategy: "weighted_vote"
+
+  # --- Feature extraction ---
+  feature_set: "full"
+  max_ast_depth: "50"
+  max_token_count: "10000"
+  ngram_range: "1,3"
+
+  # --- API settings ---
+  log_level: "info"
+  max_batch_size: "32"
+  request_timeout_seconds: "30"
+  rate_limit_per_minute: "120"
+
+  # --- Elasticsearch ---
+  elasticsearch_url: "http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200"
+  classification_index: "rubyguardian-classifications"
+  prediction_log_enabled: "true"
+
+  # --- Feature weights for ensemble ---
+  feature_config.yml: |
+    ---
+    feature_groups:
+      # Static AST-based features
+      ast_features:
+        weight: 0.35
+        features:
+          - name: eval_count
+            description: "Number of eval/instance_eval/class_eval calls"
+            type: integer
+          - name: send_count
+            description: "Number of dynamic method dispatch via send/public_send"
+            type: integer
+          - name: define_method_count
+            description: "Number of define_method calls"
+            type: integer
+          - name: const_get_count
+            description: "Number of const_get/const_set calls"
+            type: integer
+          - name: ffi_import_count
+            description: "Number of FFI/Fiddle imports"
+            type: integer
+          - name: system_call_count
+            description: "Number of system/exec/backtick calls"
+            type: integer
+          - name: ast_depth
+            description: "Maximum AST depth"
+            type: integer
+          - name: method_complexity
+            description: "Average cyclomatic complexity per method"
+            type: float
+
+      # String/encoding features
+      string_features:
+        weight: 0.20
+        features:
+          - name: base64_usage
+            description: "Presence of Base64 encode/decode"
+            type: boolean
+          - name: pack_unpack_usage
+            description: "Presence of Array#pack / String#unpack"
+            type: boolean
+          - name: string_entropy
+            description: "Shannon entropy of string literals"
+            type: float
+          - name: hex_string_ratio
+            description: "Ratio of hex-escaped strings to total strings"
+            type: float
+          - name: obfuscation_score
+            description: "Composite obfuscation score (0-1)"
+            type: float
+
+      # Network/IO features
+      network_features:
+        weight: 0.25
+        features:
+          - name: socket_usage
+            description: "Use of TCPSocket/UDPSocket/Socket"
+            type: boolean
+          - name: http_client_usage
+            description: "Use of Net::HTTP/Faraday/HTTParty"
+            type: boolean
+          - name: file_write_count
+            description: "Number of file write operations"
+            type: integer
+          - name: process_spawn_count
+            description: "Number of process spawn operations"
+            type: integer
+          - name: fd_redirect
+            description: "File descriptor redirection detected"
+            type: boolean
+
+      # Behavioral features (runtime telemetry)
+      behavioral_features:
+        weight: 0.20
+        features:
+          - name: memory_allocation_rate
+            description: "Rate of memory allocation (bytes/sec)"
+            type: float
+          - name: syscall_diversity
+            description: "Number of unique syscall types"
+            type: integer
+          - name: thread_creation_rate
+            description: "Rate of thread creation"
+            type: float
+          - name: objectspace_manipulation
+            description: "ObjectSpace API call count"
+            type: integer
+          - name: class_hierarchy_changes
+            description: "Number of runtime class modifications"
+            type: integer
+
+    # Model-specific parameters
+    models:
+      random_forest:
+        n_estimators: 200
+        max_depth: 30
+        min_samples_split: 5
+        class_weight: balanced
+        ensemble_weight: 0.4
+
+      xgboost:
+        n_estimators: 150
+        max_depth: 8
+        learning_rate: 0.1
+        scale_pos_weight: 2.0
+        ensemble_weight: 0.4
+
+      neural_network:
+        hidden_layers: [128, 64, 32]
+        activation: relu
+        dropout: 0.3
+        epochs: 100
+        batch_size: 32
+        ensemble_weight: 0.2

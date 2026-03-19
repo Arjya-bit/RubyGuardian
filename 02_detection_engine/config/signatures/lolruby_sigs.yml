@@ -1,0 +1,240 @@
+# RubyGuardian - LOLRuby (Living Off the Land Ruby) Detection Signatures
+# ======================================================================
+# Detects abuse of legitimate Ruby standard library features and common
+# gems for malicious purposes (reconnaissance, persistence, lateral
+# movement, exfiltration).
+
+signatures:
+  - id: LR-001
+    name: "System Command Execution via Kernel Methods"
+    description: >
+      Detects use of Ruby Kernel methods to execute system commands,
+      especially with suspicious command patterns.
+    severity: high
+    mitre_attack:
+      tactic: execution
+      technique: T1059.004
+    indicators:
+      ruby_api:
+        methods_called:
+          - Kernel.system
+          - Kernel.exec
+          - Kernel.spawn
+          - Kernel.`
+        argument_patterns:
+          - "curl.*|.*sh"
+          - "wget.*-O.*-"
+          - "bash -c"
+          - "/bin/sh -c"
+          - "nc -e"
+          - "ncat"
+          - "python -c"
+          - "perl -e"
+          - "chmod +x"
+          - "/etc/shadow"
+          - "/etc/passwd"
+    score: 85
+    tags: [lolruby, command_execution]
+
+  - id: LR-002
+    name: "IO.popen Reverse Shell"
+    description: >
+      Detects use of IO.popen to establish a reverse shell connection.
+    severity: critical
+    mitre_attack:
+      tactic: execution
+      technique: T1059.004
+    indicators:
+      ruby_api:
+        methods_called:
+          - IO.popen
+        argument_patterns:
+          - "/bin/sh"
+          - "/bin/bash"
+          - "cmd.exe"
+      network:
+        outbound_connection: true
+        concurrent_with_popen: true
+    score: 95
+    tags: [lolruby, reverse_shell, popen]
+
+  - id: LR-003
+    name: "Socket-based Reverse Shell"
+    description: >
+      Detects construction of a reverse shell using Ruby's Socket library
+      with stdin/stdout/stderr redirection.
+    severity: critical
+    mitre_attack:
+      tactic: command-and-control
+      technique: T1095
+    indicators:
+      ruby_api:
+        classes_used:
+          - TCPSocket
+          - Socket
+          - UNIXSocket
+        combined_with:
+          - IO.reopen
+          - STDIN.reopen
+          - STDOUT.reopen
+          - STDERR.reopen
+          - exec
+    score: 98
+    tags: [lolruby, reverse_shell, socket]
+
+  - id: LR-004
+    name: "DRb (Distributed Ruby) Abuse"
+    description: >
+      Detects use of DRb for remote code execution or as a C2 channel.
+    severity: high
+    mitre_attack:
+      tactic: command-and-control
+      technique: T1219
+    indicators:
+      ruby_api:
+        classes_used:
+          - DRb
+          - DRbServer
+        methods_called:
+          - DRb.start_service
+        binding_patterns:
+          - "0.0.0.0"
+          - "druby://"
+    score: 80
+    tags: [lolruby, drb, remote_code_execution]
+
+  - id: LR-005
+    name: "WEBrick Hidden Server"
+    description: >
+      Detects spawning a hidden WEBrick HTTP server that could serve as
+      a file exfiltration endpoint or C2 listener.
+    severity: medium
+    mitre_attack:
+      tactic: command-and-control
+      technique: T1071.001
+    indicators:
+      ruby_api:
+        classes_used:
+          - WEBrick::HTTPServer
+        methods_called:
+          - start
+        binding_patterns:
+          - "0.0.0.0"
+    score: 65
+    tags: [lolruby, webrick, c2_listener]
+
+  - id: LR-006
+    name: "Open-URI Remote Code Load"
+    description: >
+      Detects use of open-uri to download and immediately execute remote code.
+    severity: critical
+    mitre_attack:
+      tactic: execution
+      technique: T1105
+    indicators:
+      ruby_api:
+        methods_called:
+          - URI.open
+          - Kernel.open
+        argument_patterns:
+          - "http://"
+          - "https://"
+        followed_by:
+          - eval
+          - load
+          - require
+    score: 94
+    tags: [lolruby, open_uri, remote_load]
+
+  - id: LR-007
+    name: "ERB Template Injection"
+    description: >
+      Detects use of ERB templates with dynamic content that could
+      allow server-side template injection (SSTI).
+    severity: high
+    mitre_attack:
+      tactic: execution
+      technique: T1221
+    indicators:
+      ruby_api:
+        classes_used:
+          - ERB
+        methods_called:
+          - new
+          - result
+        input_from:
+          - network
+          - environment
+          - user_input
+    score: 75
+    tags: [lolruby, erb, template_injection]
+
+  - id: LR-008
+    name: "Gem Specification Manipulation"
+    description: >
+      Detects runtime manipulation of Gem specifications to inject
+      malicious code into the gem loading path.
+    severity: high
+    mitre_attack:
+      tactic: persistence
+      technique: T1546
+    indicators:
+      ruby_api:
+        classes_used:
+          - Gem::Specification
+          - Gem::Installer
+        methods_called:
+          - install
+          - activate
+        filesystem:
+          write_to_gem_path: true
+    score: 82
+    tags: [lolruby, gem_manipulation, persistence]
+
+  - id: LR-009
+    name: "Marshal Deserialization Attack"
+    description: >
+      Detects deserialization of untrusted data via Marshal.load which
+      can lead to arbitrary code execution.
+    severity: high
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      ruby_api:
+        methods_called:
+          - Marshal.load
+          - Marshal.restore
+        input_from:
+          - network
+          - file
+          - environment
+    score: 80
+    tags: [lolruby, deserialization, marshal]
+
+  - id: LR-010
+    name: "Fiddle/FFI Native Function Calls"
+    description: >
+      Detects use of Fiddle or FFI to call native system functions
+      that bypass Ruby-level security controls.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055
+    indicators:
+      ruby_api:
+        classes_used:
+          - Fiddle
+          - Fiddle::Function
+          - Fiddle::Importer
+          - FFI
+        suspicious_functions:
+          - dlopen
+          - dlsym
+          - mmap
+          - mprotect
+          - execve
+          - system
+          - fork
+    score: 85
+    tags: [lolruby, fiddle, ffi, native_calls]

@@ -1,0 +1,57 @@
+# =============================================================================
+# RubyGuardian - Elasticsearch Service
+# =============================================================================
+# Cluster-internal service that fronts the Elasticsearch StatefulSet.
+# All components (detection agent, honeypot, ML classifier, dashboard)
+# connect to ES through this service name.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: elasticsearch
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: rubyguardian
+  annotations:
+    description: "Cluster-internal HTTP endpoint for Elasticsearch"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: elasticsearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+      protocol: TCP
+    - name: transport
+      port: 9300
+      targetPort: transport
+      protocol: TCP
+
+---
+# Optional NodePort for development access to Elasticsearch
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-dev-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: elasticsearch
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: rubyguardian
+    environment: development
+  annotations:
+    description: "NodePort service for development access to Elasticsearch"
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: elasticsearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+      nodePort: 30920
+      protocol: TCP

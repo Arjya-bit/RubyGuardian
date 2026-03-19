@@ -1,0 +1,189 @@
+# RubyGuardian - Fileless Execution Detection Signatures
+# ======================================================
+# Detects techniques where malicious Ruby code is executed without
+# touching the filesystem, including eval chains, memory-only payloads,
+# and runtime code generation.
+
+signatures:
+  - id: FE-001
+    name: "Eval Chain Execution"
+    description: >
+      Detects chains of eval/instance_eval/class_eval calls that indicate
+      runtime code injection or obfuscated payload execution.
+    severity: high
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      ruby_api:
+        methods_called:
+          - eval
+          - instance_eval
+          - class_eval
+          - module_eval
+        call_depth: ">= 3"  # Nested eval calls
+      threshold:
+        count: 5
+        window_seconds: 60
+    score: 85
+    tags: [fileless, eval_chain, code_injection]
+
+  - id: FE-002
+    name: "Base64 Decode and Eval"
+    description: >
+      Detects the common pattern of Base64-decoding a string and immediately
+      evaluating it, a classic fileless payload delivery technique.
+    severity: critical
+    mitre_attack:
+      tactic: execution
+      technique: T1140
+    indicators:
+      ruby_api:
+        call_sequence:
+          - Base64.decode64
+          - eval
+        window_ms: 1000
+      string_patterns:
+        - "Base64.decode64"
+        - "eval("
+        - "instance_eval("
+    score: 95
+    tags: [fileless, base64, obfuscation]
+
+  - id: FE-003
+    name: "Dynamic Method Definition"
+    description: >
+      Detects suspicious runtime method definition using define_method
+      with dynamically generated code bodies.
+    severity: medium
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      ruby_api:
+        methods_called:
+          - define_method
+          - method_missing
+          - respond_to_missing?
+      threshold:
+        count: 10
+        window_seconds: 30
+    score: 60
+    tags: [fileless, dynamic_methods]
+
+  - id: FE-004
+    name: "Network Fetch and Eval"
+    description: >
+      Detects downloading code from a remote source and immediately
+      executing it in the Ruby runtime.
+    severity: critical
+    mitre_attack:
+      tactic: execution
+      technique: T1105
+    indicators:
+      ruby_api:
+        call_sequence:
+          - Net::HTTP.get
+          - eval
+        window_ms: 5000
+      alternate_sequences:
+        - [open-uri, eval]
+        - [Net::HTTP.start, instance_eval]
+        - [Faraday.get, eval]
+        - [URI.open, eval]
+    score: 98
+    tags: [fileless, remote_code, download_exec]
+
+  - id: FE-005
+    name: "String Manipulation Obfuscation"
+    description: >
+      Detects heavy string manipulation (reverse, rot13, XOR, split/join)
+      followed by eval, indicating obfuscated fileless payloads.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1027
+    indicators:
+      ruby_api:
+        call_chain_contains:
+          any_of:
+            - reverse
+            - tr
+            - gsub
+            - unpack
+            - pack
+            - chars.map
+            - bytes.map
+          followed_by:
+            - eval
+            - instance_eval
+    score: 88
+    tags: [fileless, obfuscation, string_manipulation]
+
+  - id: FE-006
+    name: "Proc/Lambda Code Injection"
+    description: >
+      Detects creation and execution of Proc or Lambda objects from
+      dynamically generated or received strings.
+    severity: medium
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      ruby_api:
+        patterns:
+          - "Proc.new"
+          - "lambda"
+          - "-> {"
+        preceded_by:
+          - eval
+          - instance_eval
+    score: 55
+    tags: [fileless, proc_injection]
+
+  - id: FE-007
+    name: "Memfd-based Ruby Script Execution"
+    description: >
+      Detects Ruby scripts being written to anonymous memory-backed file
+      descriptors and then loaded/required from /proc/self/fd/.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1620
+    indicators:
+      syscall_sequence:
+        window_ms: 5000
+        ordered: true
+        syscalls:
+          - memfd_create
+          - write
+      filesystem:
+        path_pattern: "/proc/self/fd/*"
+        operation: read
+      ruby_api:
+        methods_called:
+          - require
+          - load
+        argument_pattern: "/proc/self/fd/"
+    score: 96
+    tags: [fileless, memfd, proc_fd]
+
+  - id: FE-008
+    name: "RubyVM::InstructionSequence Abuse"
+    description: >
+      Detects direct manipulation of Ruby bytecode via
+      RubyVM::InstructionSequence to inject or modify code at the VM level.
+    severity: critical
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      ruby_api:
+        classes_used:
+          - RubyVM::InstructionSequence
+        methods_called:
+          - compile
+          - load_from_binary
+          - eval
+    score: 92
+    tags: [fileless, bytecode_injection, vm_manipulation]

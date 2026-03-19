@@ -1,0 +1,134 @@
+{
+  "index_patterns": ["rg-forensic-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1,
+      "refresh_interval": "10s",
+      "index.lifecycle.name": "rg-forensic-policy",
+      "index.lifecycle.rollover_alias": "rg-forensic"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "report_id": { "type": "keyword" },
+        "report_type": { "type": "keyword" },
+        "status": { "type": "keyword" },
+        "analyst": { "type": "keyword" },
+        "target": {
+          "type": "object",
+          "properties": {
+            "hostname": { "type": "keyword" },
+            "ip": { "type": "ip" },
+            "os": { "type": "keyword" },
+            "ruby_version": { "type": "keyword" },
+            "pid": { "type": "integer" },
+            "process_name": { "type": "keyword" }
+          }
+        },
+        "memory_dump": {
+          "type": "object",
+          "properties": {
+            "dump_id": { "type": "keyword" },
+            "size_bytes": { "type": "long" },
+            "capture_time": { "type": "date" },
+            "heap_size": { "type": "long" },
+            "stack_size": { "type": "long" },
+            "regions": {
+              "type": "nested",
+              "properties": {
+                "address_start": { "type": "keyword" },
+                "address_end": { "type": "keyword" },
+                "permissions": { "type": "keyword" },
+                "type": { "type": "keyword" },
+                "suspicious": { "type": "boolean" },
+                "entropy": { "type": "float" }
+              }
+            },
+            "strings_of_interest": { "type": "text" },
+            "injected_code_detected": { "type": "boolean" },
+            "shellcode_signatures": { "type": "keyword" }
+          }
+        },
+        "objectspace": {
+          "type": "object",
+          "properties": {
+            "snapshot_id": { "type": "keyword" },
+            "total_objects": { "type": "long" },
+            "total_size": { "type": "long" },
+            "class_distribution": {
+              "type": "nested",
+              "properties": {
+                "class_name": { "type": "keyword" },
+                "count": { "type": "long" },
+                "total_size": { "type": "long" },
+                "anomaly_score": { "type": "float" }
+              }
+            },
+            "suspicious_objects": {
+              "type": "nested",
+              "properties": {
+                "object_id": { "type": "keyword" },
+                "class_name": { "type": "keyword" },
+                "size": { "type": "long" },
+                "references_to": { "type": "keyword" },
+                "reason": { "type": "text" }
+              }
+            },
+            "gc_stats": {
+              "type": "object",
+              "properties": {
+                "count": { "type": "integer" },
+                "heap_allocated_pages": { "type": "integer" },
+                "heap_available_slots": { "type": "long" },
+                "heap_live_slots": { "type": "long" },
+                "heap_free_slots": { "type": "long" },
+                "total_allocated_objects": { "type": "long" },
+                "total_freed_objects": { "type": "long" }
+              }
+            }
+          }
+        },
+        "timeline": {
+          "type": "nested",
+          "properties": {
+            "timestamp": { "type": "date" },
+            "event_type": { "type": "keyword" },
+            "description": { "type": "text" },
+            "artifact": { "type": "keyword" },
+            "severity": { "type": "keyword" }
+          }
+        },
+        "findings": {
+          "type": "nested",
+          "properties": {
+            "finding_id": { "type": "keyword" },
+            "severity": { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "title": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+            "description": { "type": "text" },
+            "evidence": { "type": "text" },
+            "mitre_technique": { "type": "keyword" },
+            "confidence": { "type": "float" }
+          }
+        },
+        "iocs": {
+          "type": "nested",
+          "properties": {
+            "type": { "type": "keyword" },
+            "value": { "type": "keyword" },
+            "context": { "type": "text" }
+          }
+        },
+        "tags": { "type": "keyword" },
+        "summary": { "type": "text" }
+      }
+    }
+  },
+  "_meta": {
+    "description": "RubyGuardian forensic reports index template",
+    "version": "1.0.0"
+  }
+}

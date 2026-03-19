@@ -1,0 +1,27 @@
+# =============================================================================
+# RubyGuardian - ML Classifier Service
+# =============================================================================
+# Exposes the ML classification REST API within the cluster.  The detection
+# agent and dashboard call this service to classify Ruby scripts.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-classifier-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/component: classification
+    app.kubernetes.io/part-of: rubyguardian
+  annotations:
+    description: "Cluster-internal service for the ML classifier REST API"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ml-classifier
+  ports:
+    - name: http-api
+      port: 8000
+      targetPort: http-api
+      protocol: TCP

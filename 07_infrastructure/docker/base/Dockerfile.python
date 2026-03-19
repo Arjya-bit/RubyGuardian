@@ -1,0 +1,100 @@
+# =============================================================================
+# RubyGuardian - Base Python Image
+# =============================================================================
+# Provides the runtime for the ML classifier, Volatility plugins, and any
+# Python-based analysis tooling.
+#
+# Build:
+#   docker build -f Dockerfile.python -t rubyguardian/python-base:latest .
+# =============================================================================
+
+FROM python:3.11-slim-bookworm AS base
+
+LABEL maintainer="RubyGuardian Project <security@rubyguardian.dev>"
+LABEL org.opencontainers.image.title="RubyGuardian Python Base"
+LABEL org.opencontainers.image.description="Base Python image for ML classifier and forensics plugins"
+LABEL org.opencontainers.image.version="1.0.0"
+
+# ---- System dependencies ----------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Non-root user ----------------------------------------------------------
+RUN groupadd -r guardian && useradd -r -g guardian -m -s /bin/bash guardian
+
+# ---- Application directory ---------------------------------------------------
+WORKDIR /opt/rubyguardian
+
+# ---- Python dependencies -----------------------------------------------------
+COPY requirements.txt pyproject.toml ./
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r requirements.txt
+
+# ---- Copy source -------------------------------------------------------------
+COPY . .
+RUN chown -R guardian:guardian /opt/rubyguardian
+
+# =============================================================================
+# Target: ml-classifier-api
+# Serves the trained Random Forest + LSTM model over a REST API.
+# =============================================================================
+FROM base AS ml-classifier-api
+
+USER guardian
+
+ENV PYTHONUNBUFFERED=1 \
+    RUBY_GUARDIAN_COMPONENT=ml_classifier \
+    RUBY_GUARDIAN_MODEL_PATH=/opt/rubyguardian/03_ml_classifier/models \
+    RUBY_GUARDIAN_API_HOST=0.0.0.0 \
+    RUBY_GUARDIAN_API_PORT=5000 \
+    RUBY_GUARDIAN_LOG_LEVEL=info
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -sf http://localhost:5000/health || exit 1
+
+EXPOSE 5000
+
+ENTRYPOINT ["python", "-m"]
+CMD ["03_ml_classifier.api.classifier_api", "--host", "0.0.0.0", "--port", "5000"]
+
+# =============================================================================
+# Target: volatility-plugins
+# Provides custom Volatility 3 plugins for Ruby process analysis.
+# =============================================================================
+FROM base AS volatility-plugins
+
+RUN pip install --no-cache-dir volatility3
+
+USER guardian
+
+ENV PYTHONUNBUFFERED=1 \
+    RUBY_GUARDIAN_COMPONENT=volatility_plugins \
+    VOLATILITY_PLUGINS=/opt/rubyguardian/04_memory_forensics/python/volatility_plugins
+
+VOLUME ["/opt/rubyguardian/dumps"]
+
+ENTRYPOINT ["python", "-m"]
+CMD ["volatility3", "-h"]
+
+# =============================================================================
+# Target: model-trainer
+# One-shot container for training / retraining the ML classifier.
+# =============================================================================
+FROM base AS model-trainer
+
+USER guardian
+
+ENV PYTHONUNBUFFERED=1 \
+    RUBY_GUARDIAN_COMPONENT=model_trainer \
+    RUBY_GUARDIAN_DATA_DIR=/opt/rubyguardian/data \
+    RUBY_GUARDIAN_MODEL_DIR=/opt/rubyguardian/03_ml_classifier/models
+
+VOLUME ["/opt/rubyguardian/data", "/opt/rubyguardian/03_ml_classifier/models"]
+
+ENTRYPOINT ["python", "-m"]
+CMD ["03_ml_classifier.training.train_model", "--config", "03_ml_classifier/config/training_config.yml"]

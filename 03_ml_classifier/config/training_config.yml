@@ -1,0 +1,95 @@
+# RubyGuardian ML Classifier - Training Configuration
+
+version: "0.3.0"
+
+# Data pipeline
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  augmented_dir: "data/augmented"
+  test_size: 0.2
+  validation_size: 0.15
+  random_state: 42
+  stratify: true
+
+# Cross-validation
+cross_validation:
+  strategy: "stratified_kfold"
+  n_splits: 5
+  shuffle: true
+  random_state: 42
+
+# Class balancing
+class_balancing:
+  strategy: "hybrid"
+  oversampling:
+    method: "smote"
+    sampling_strategy: "auto"
+    k_neighbors: 5
+  undersampling:
+    method: "tomek_links"
+    sampling_strategy: "auto"
+  augmentation:
+    enabled: true
+    techniques:
+      - variable_renaming
+      - whitespace_variation
+      - comment_injection
+      - statement_reordering
+    multiplier: 2
+
+# Hyperparameter tuning
+hyperparameter_tuning:
+  enabled: true
+  method: "optuna"
+  n_trials: 100
+  timeout_seconds: 3600
+  metric: "f1_weighted"
+  direction: "maximize"
+  pruner:
+    type: "median"
+    n_startup_trials: 10
+    n_warmup_steps: 5
+
+# Training pipeline
+pipeline:
+  steps:
+    - name: "feature_extraction"
+      enabled: true
+      cache: true
+    - name: "feature_selection"
+      enabled: true
+      method: "mutual_information"
+      max_features: 200
+    - name: "normalization"
+      enabled: true
+      method: "standard_scaler"
+    - name: "class_balancing"
+      enabled: true
+    - name: "model_training"
+      enabled: true
+      models:
+        - random_forest
+        - gradient_boost
+        - neural_network
+    - name: "ensemble_creation"
+      enabled: true
+    - name: "evaluation"
+      enabled: true
+    - name: "model_export"
+      enabled: true
+
+# Experiment tracking
+mlflow:
+  enabled: true
+  tracking_uri: "mlruns"
+  experiment_name: "rubyguardian_classifier"
+  log_models: true
+  log_artifacts: true
+
+# Output
+output:
+  model_dir: "models/saved_models"
+  report_dir: "models/evaluation/reports"
+  plots_dir: "models/evaluation/plots"
+  checkpoint_dir: "models/training/checkpoints"

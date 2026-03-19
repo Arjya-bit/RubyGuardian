@@ -1,0 +1,206 @@
+# RubyGuardian Phase 5 - Threat Intelligence Feeds Configuration
+# External threat intelligence sources for enrichment and correlation
+
+threat_feeds:
+  # Feed ingestion settings
+  ingestion:
+    enabled: true
+    update_interval_minutes: 60
+    max_concurrent_fetches: 5
+    request_timeout_seconds: 30
+    retry_count: 3
+    retry_delay_seconds: 10
+    user_agent: "RubyGuardian-ThreatIntel/5.0"
+    cache_directory: "/var/lib/rubyguardian/honeypot/feed_cache"
+    cache_ttl_hours: 4
+
+  # IP reputation feeds
+  ip_reputation:
+    - name: "abuse_ipdb"
+      enabled: true
+      type: "api"
+      url: "https://api.abuseipdb.com/api/v2/blacklist"
+      api_key: "${ABUSEIPDB_API_KEY}"
+      format: "json"
+      update_interval_minutes: 360
+      confidence_threshold: 75
+      headers:
+        Accept: "application/json"
+        Key: "${ABUSEIPDB_API_KEY}"
+
+    - name: "blocklist_de"
+      enabled: true
+      type: "plaintext"
+      url: "https://lists.blocklist.de/lists/all.txt"
+      format: "ip_list"
+      update_interval_minutes: 120
+      description: "Blocklist.de aggregated IP list"
+
+    - name: "emerging_threats_compromised"
+      enabled: true
+      type: "plaintext"
+      url: "https://rules.emergingthreats.net/blockrules/compromised-ips.txt"
+      format: "ip_list"
+      update_interval_minutes: 240
+      description: "Emerging Threats compromised IP list"
+
+    - name: "tor_exit_nodes"
+      enabled: true
+      type: "plaintext"
+      url: "https://check.torproject.org/torbulkexitlist"
+      format: "ip_list"
+      update_interval_minutes: 60
+      description: "Tor exit node list"
+      tag: "tor"
+
+    - name: "firehol_level1"
+      enabled: true
+      type: "plaintext"
+      url: "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset"
+      format: "cidr_list"
+      update_interval_minutes: 360
+      description: "FireHOL Level 1 - confirmed attacks"
+
+    - name: "spamhaus_drop"
+      enabled: true
+      type: "plaintext"
+      url: "https://www.spamhaus.org/drop/drop.txt"
+      format: "cidr_list_with_comments"
+      update_interval_minutes: 720
+      description: "Spamhaus DROP list"
+
+  # Malware hash feeds
+  malware_hashes:
+    - name: "malware_bazaar_recent"
+      enabled: true
+      type: "api"
+      url: "https://mb-api.abuse.ch/api/v1/"
+      format: "json"
+      update_interval_minutes: 60
+      request_method: "POST"
+      request_body:
+        query: "get_recent"
+        selector: "time"
+      description: "MalwareBazaar recent samples"
+
+    - name: "ruby_malware_signatures"
+      enabled: true
+      type: "custom"
+      url: "https://rubyguardian.internal/api/v1/signatures"
+      format: "json"
+      api_key: "${RUBYGUARDIAN_API_KEY}"
+      update_interval_minutes: 30
+      description: "RubyGuardian custom Ruby malware signatures"
+
+  # Ruby/Gem specific threat feeds
+  ruby_specific:
+    - name: "rubysec_advisories"
+      enabled: true
+      type: "git"
+      url: "https://github.com/rubysec/ruby-advisory-db.git"
+      branch: "main"
+      format: "yaml_directory"
+      update_interval_minutes: 720
+      description: "RubySec Advisory Database"
+
+    - name: "bundler_audit_db"
+      enabled: true
+      type: "git"
+      url: "https://github.com/rubysec/ruby-advisory-db.git"
+      branch: "main"
+      format: "yaml_directory"
+      path: "gems"
+      update_interval_minutes: 720
+      description: "Bundler Audit vulnerability database"
+
+    - name: "malicious_gems_watchlist"
+      enabled: true
+      type: "custom"
+      format: "yaml"
+      local_path: "/var/lib/rubyguardian/honeypot/watchlists/malicious_gems.yml"
+      update_interval_minutes: 60
+      description: "Custom watchlist of known malicious gem names and patterns"
+
+  # Domain/URL feeds
+  domain_feeds:
+    - name: "openphish"
+      enabled: true
+      type: "plaintext"
+      url: "https://openphish.com/feed.txt"
+      format: "url_list"
+      update_interval_minutes: 360
+      description: "OpenPhish phishing URL feed"
+
+    - name: "urlhaus"
+      enabled: true
+      type: "api"
+      url: "https://urlhaus-api.abuse.ch/v1/urls/recent/"
+      format: "json"
+      update_interval_minutes: 60
+      description: "URLhaus malware URL database"
+
+  # Attack pattern feeds
+  attack_patterns:
+    - name: "ruby_attack_patterns"
+      enabled: true
+      type: "custom"
+      format: "yaml"
+      local_path: "/var/lib/rubyguardian/honeypot/patterns/ruby_attacks.yml"
+      description: "Custom Ruby attack pattern signatures"
+      patterns:
+        - name: "eval_injection"
+          severity: "critical"
+          regex: 'eval\s*\(.*\$|eval\s*\(.*params|instance_eval.*user'
+          description: "Eval-based code injection in Ruby"
+        - name: "marshal_deserialization"
+          severity: "critical"
+          regex: 'Marshal\.load|Marshal\.restore|YAML\.load\b[^_]'
+          description: "Unsafe deserialization attempts"
+        - name: "command_injection"
+          severity: "critical"
+          regex: 'system\s*\(.*[`$]|%x\{.*\$|`.*\$\{|Open3.*params'
+          description: "Command injection via system/backtick/Open3"
+        - name: "path_traversal"
+          severity: "high"
+          regex: '\.\./|\.\.\%2[fF]|\.\.\\\\|%2e%2e'
+          description: "Directory traversal attempts"
+        - name: "sql_injection"
+          severity: "high"
+          regex: "('\\s*(OR|AND)\\s*'|UNION\\s+SELECT|;\\s*DROP|--\\s*$|/\\*.*\\*/)"
+          description: "SQL injection attempts"
+        - name: "gem_backdoor"
+          severity: "critical"
+          regex: 'require\s+["\x27]net/http|require\s+["\x27]socket|IO\.popen|Kernel\.exec'
+          description: "Patterns common in gem backdoors"
+        - name: "reverse_shell"
+          severity: "critical"
+          regex: 'TCPSocket\.new|Socket\.tcp|/bin/(ba)?sh|bash\s+-i|nc\s+-e'
+          description: "Reverse shell connection attempts"
+
+# Correlation settings
+correlation:
+  enabled: true
+  # Correlate honeypot data with threat feeds
+  auto_tag: true
+  enrichment_on_capture: true
+  # Minimum confidence score to flag as known threat
+  confidence_threshold: 60
+  # How long to retain enrichment data
+  retention_days: 90
+
+# Export settings for sharing threat intelligence
+export:
+  enabled: false
+  formats:
+    - type: "stix2"
+      output_path: "/var/lib/rubyguardian/honeypot/export/stix2"
+    - type: "csv"
+      output_path: "/var/lib/rubyguardian/honeypot/export/csv"
+    - type: "json"
+      output_path: "/var/lib/rubyguardian/honeypot/export/json"
+  share_with:
+    - name: "rubyguardian_central"
+      url: "https://api.rubyguardian.internal/v1/threat-intel/submit"
+      api_key: "${RUBYGUARDIAN_CENTRAL_API_KEY}"
+      auto_submit: false
+      min_confidence: 80

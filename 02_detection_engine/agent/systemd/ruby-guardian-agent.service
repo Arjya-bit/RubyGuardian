@@ -1,0 +1,25 @@
+[Unit]
+Description=RubyGuardian Detection Agent
+Documentation=https://github.com/your-org/RubyGuardian
+After=network.target auditd.service
+Wants=auditd.service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/ruby /opt/ruby-guardian/agent/ruby_guardian_agent.rb --config /etc/ruby-guardian/detection_config.yml
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+LimitNOFILE=65536
+LimitNPROC=4096
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/ruby-guardian /var/run/ruby-guardian
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_NET_ADMIN CAP_SYS_ADMIN
+AmbientCapabilities=CAP_SYS_PTRACE CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target

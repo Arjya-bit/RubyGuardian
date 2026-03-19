@@ -1,0 +1,477 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "RubyGuardian Agent Performance - Per-agent metrics and process monitoring",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["ruby-guardian"],
+      "title": "RubyGuardian Dashboards",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 300,
+      "title": "Agent Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["distinctCount"], "fields": "/^agent\\.id$/", "values": false } },
+      "title": "Total Agents",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "agent.id", "id": "2", "settings": { "min_doc_count": "1", "size": "0" }, "type": "terms" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 5000 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "Events Processed",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "Critical Alerts",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "agent.hostname: $agent AND severity: critical",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "orange", "value": 60 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Avg Threat Score",
+      "type": "gauge",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "field": "threat_score", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent",
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Avg CPU %",
+      "type": "gauge",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "field": "process.cpu_percent", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 268435456 },
+              { "color": "red", "value": 1073741824 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false } },
+      "title": "Avg Memory",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "field": "process.memory_usage", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 301,
+      "title": "Process Monitoring",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "stacking": { "mode": "none" }
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 7 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Process CPU Usage Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "PID {{term process.pid}} - {{term process.name}}",
+          "bucketAggs": [
+            { "field": "process.pid", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "process.name", "id": "4", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "field": "process.cpu_percent", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "stacking": { "mode": "none" }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 7 },
+      "id": 8,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Process Memory Usage Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "PID {{term process.pid}} - {{term process.name}}",
+          "bucketAggs": [
+            { "field": "process.pid", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "process.name", "id": "4", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "field": "process.memory_usage", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 302,
+      "title": "Detection Performance",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 18 },
+      "id": 9,
+      "options": { "legend": { "calcs": ["sum", "mean"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Events by Severity Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{term severity}}",
+          "bucketAggs": [
+            { "field": "severity", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "5" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1, "stacking": { "mode": "none" } }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 18 },
+      "id": 10,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "orientation": "horizontal" },
+      "title": "Top Event Types by Agent",
+      "type": "barchart",
+      "targets": [
+        {
+          "alias": "{{term event_type}}",
+          "bucketAggs": [
+            { "field": "event_type", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" }, "type": "terms" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "agent.hostname: $agent",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "id": 303,
+      "title": "Ruby Runtime Analysis",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal" } }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 29 },
+      "id": 11,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Ruby Methods Called Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{term ruby.method_called}}",
+          "bucketAggs": [
+            { "field": "ruby.method_called", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "agent.hostname: $agent AND ruby.method_called: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 29 },
+      "id": 12,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Obfuscation Score Trend",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "Avg Obfuscation Score",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "ruby.obfuscation_score", "id": "1", "type": "avg" }],
+          "query": "agent.hostname: $agent AND ruby.obfuscation_score: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "Max Obfuscation Score",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "ruby.obfuscation_score", "id": "1", "type": "max" }],
+          "query": "agent.hostname: $agent AND ruby.obfuscation_score: *",
+          "refId": "B",
+          "timeField": "@timestamp"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ruby-guardian", "agent-performance"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+        "definition": "{\"find\": \"terms\", \"field\": \"agent.hostname\"}",
+        "includeAll": true,
+        "multi": false,
+        "name": "agent",
+        "query": "{\"find\": \"terms\", \"field\": \"agent.hostname\"}",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+        "definition": "{\"find\": \"terms\", \"field\": \"agent.os\"}",
+        "includeAll": true,
+        "multi": true,
+        "name": "os",
+        "query": "{\"find\": \"terms\", \"field\": \"agent.os\"}",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "RubyGuardian - Agent Performance",
+  "uid": "rg-agent-performance",
+  "version": 1
+}

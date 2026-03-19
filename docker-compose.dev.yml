@@ -1,0 +1,47 @@
+version: '3.8'
+
+# Development overrides - mounts source code and enables hot reload
+
+services:
+  attacker:
+    volumes:
+      - ./01_attack_framework:/app/attack_framework
+    environment:
+      - RUBY_ENV=development
+      - LOG_LEVEL=debug
+
+  c2-server:
+    volumes:
+      - ./01_attack_framework/1b_cicd_poisoning/c2_server:/app
+    environment:
+      - RACK_ENV=development
+    command: bundle exec rerun -- rackup config.ru -o 0.0.0.0 -p 4444
+
+  detection-agent:
+    volumes:
+      - ./02_detection_engine:/app/detection_engine
+    environment:
+      - LOG_LEVEL=debug
+      - DRY_RUN=true
+
+  classifier-api:
+    volumes:
+      - ./03_ml_classifier:/app/ml_classifier
+    environment:
+      - DEBUG=true
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+  honeypot-rails:
+    volumes:
+      - ./05_honeypot:/app/honeypot
+    environment:
+      - RAILS_ENV=development
+
+  elasticsearch:
+    environment:
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+
+  web-ui:
+    volumes:
+      - ./06_dashboard/web_ui/src:/app/src
+    command: npm run dev -- --host 0.0.0.0

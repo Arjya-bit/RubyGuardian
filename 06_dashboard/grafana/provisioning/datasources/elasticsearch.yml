@@ -1,0 +1,97 @@
+# =============================================================================
+# RubyGuardian - Grafana Elasticsearch Datasource Provisioning
+# =============================================================================
+
+apiVersion: 1
+
+deleteDatasources:
+  - name: RubyGuardian-Events
+    orgId: 1
+  - name: RubyGuardian-Honeypot
+    orgId: 1
+  - name: RubyGuardian-Forensic
+    orgId: 1
+  - name: RubyGuardian-ML
+    orgId: 1
+
+datasources:
+  - name: RubyGuardian-Events
+    type: elasticsearch
+    access: proxy
+    orgId: 1
+    uid: rg-es-events
+    url: http://${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}
+    database: "rg-events-*"
+    isDefault: true
+    jsonData:
+      esVersion: "8.12.0"
+      timeField: "@timestamp"
+      interval: Daily
+      logMessageField: raw_message
+      logLevelField: severity
+      maxConcurrentShardRequests: 5
+      includeFrozen: false
+    secureJsonData:
+      basicAuthPassword: "${ELASTIC_PASSWORD:changeme}"
+    basicAuth: true
+    basicAuthUser: elastic
+    editable: true
+
+  - name: RubyGuardian-Honeypot
+    type: elasticsearch
+    access: proxy
+    orgId: 1
+    uid: rg-es-honeypot
+    url: http://${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}
+    database: "rg-honeypot-*"
+    isDefault: false
+    jsonData:
+      esVersion: "8.12.0"
+      timeField: "@timestamp"
+      interval: Daily
+      logMessageField: notes
+      logLevelField: classification.sophistication
+      maxConcurrentShardRequests: 5
+    secureJsonData:
+      basicAuthPassword: "${ELASTIC_PASSWORD:changeme}"
+    basicAuth: true
+    basicAuthUser: elastic
+    editable: true
+
+  - name: RubyGuardian-Forensic
+    type: elasticsearch
+    access: proxy
+    orgId: 1
+    uid: rg-es-forensic
+    url: http://${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}
+    database: "rg-forensic-*"
+    isDefault: false
+    jsonData:
+      esVersion: "8.12.0"
+      timeField: "@timestamp"
+      interval: Daily
+      maxConcurrentShardRequests: 5
+    secureJsonData:
+      basicAuthPassword: "${ELASTIC_PASSWORD:changeme}"
+    basicAuth: true
+    basicAuthUser: elastic
+    editable: true
+
+  - name: RubyGuardian-ML
+    type: elasticsearch
+    access: proxy
+    orgId: 1
+    uid: rg-es-ml
+    url: http://${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}
+    database: "rg-ml-*"
+    isDefault: false
+    jsonData:
+      esVersion: "8.12.0"
+      timeField: "@timestamp"
+      interval: Daily
+      maxConcurrentShardRequests: 5
+    secureJsonData:
+      basicAuthPassword: "${ELASTIC_PASSWORD:changeme}"
+    basicAuth: true
+    basicAuthUser: elastic
+    editable: true

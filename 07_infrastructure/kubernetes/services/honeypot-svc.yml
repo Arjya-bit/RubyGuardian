@@ -1,0 +1,40 @@
+# =============================================================================
+# RubyGuardian - Honeypot Service
+# =============================================================================
+# Exposes honeypot decoy services.  Uses LoadBalancer type so the honeypot
+# is reachable from outside the cluster — this is intentional since the
+# honeypot must be accessible to potential attackers.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: honeypot-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: honeypot
+    app.kubernetes.io/component: deception
+    app.kubernetes.io/part-of: rubyguardian
+  annotations:
+    description: "Externally-reachable service for honeypot decoy applications"
+    # In cloud environments, request a static IP for consistent adversary targeting
+    # service.beta.kubernetes.io/aws-load-balancer-type: nlb
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: honeypot
+  ports:
+    - name: http-rails
+      port: 3000
+      targetPort: http-rails
+      protocol: TCP
+    - name: http-gems
+      port: 9292
+      targetPort: http-gems
+      protocol: TCP
+    - name: http-ci
+      port: 8080
+      targetPort: http-ci
+      protocol: TCP
+  # Preserve client source IPs for forensic value
+  externalTrafficPolicy: Local

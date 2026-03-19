@@ -1,0 +1,104 @@
+# RubyGuardian - auditd Rules for Ruby Process Monitoring
+# ========================================================
+# Install: sudo cp auditd_ruby.rules /etc/audit/rules.d/ruby-guardian.rules
+# Reload:  sudo augenrules --load
+#
+# These rules monitor Ruby-specific activities that may indicate
+# malicious behavior at the kernel audit level.
+
+# ---------------------------------------------------------------
+# 1. Process Execution Monitoring
+# ---------------------------------------------------------------
+
+# Monitor Ruby interpreter execution
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/ruby -k ruby_exec
+-a always,exit -F arch=b64 -S execve -F path=/usr/local/bin/ruby -k ruby_exec
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/bundle -k ruby_exec
+
+# Monitor execution from suspicious paths
+-a always,exit -F arch=b64 -S execve -F dir=/tmp -k ruby_suspicious_exec
+-a always,exit -F arch=b64 -S execve -F dir=/var/tmp -k ruby_suspicious_exec
+-a always,exit -F arch=b64 -S execve -F dir=/dev/shm -k ruby_suspicious_exec
+
+# ---------------------------------------------------------------
+# 2. Fork/Clone Monitoring
+# ---------------------------------------------------------------
+
+# Monitor fork and clone calls from Ruby processes
+-a always,exit -F arch=b64 -S fork -F exe=/usr/bin/ruby -k ruby_fork
+-a always,exit -F arch=b64 -S clone -F exe=/usr/bin/ruby -k ruby_clone
+-a always,exit -F arch=b64 -S clone3 -F exe=/usr/bin/ruby -k ruby_clone
+
+# ---------------------------------------------------------------
+# 3. Memory Manipulation Monitoring
+# ---------------------------------------------------------------
+
+# Monitor mmap with executable permissions (potential code injection)
+-a always,exit -F arch=b64 -S mmap -F a2&0x4 -F exe=/usr/bin/ruby -k ruby_mmap_exec
+-a always,exit -F arch=b64 -S mmap -F a2&0x4 -F exe=/usr/local/bin/ruby -k ruby_mmap_exec
+
+# Monitor mprotect to add execute permission (RW -> RWX)
+-a always,exit -F arch=b64 -S mprotect -F a2&0x4 -F exe=/usr/bin/ruby -k ruby_mprotect_exec
+
+# Monitor memfd_create (fileless execution technique)
+-a always,exit -F arch=b64 -S memfd_create -k ruby_memfd
+
+# Monitor process_vm_readv/writev (cross-process memory access)
+-a always,exit -F arch=b64 -S process_vm_readv -k ruby_vm_read
+-a always,exit -F arch=b64 -S process_vm_writev -k ruby_vm_write
+
+# ---------------------------------------------------------------
+# 4. Ptrace Monitoring
+# ---------------------------------------------------------------
+
+# Monitor ptrace calls (process injection/debugging)
+-a always,exit -F arch=b64 -S ptrace -k ruby_ptrace
+-a always,exit -F arch=b64 -S ptrace -F a0=0x10 -k ruby_ptrace_attach
+-a always,exit -F arch=b64 -S ptrace -F a0=0x4 -k ruby_ptrace_getregs
+-a always,exit -F arch=b64 -S ptrace -F a0=0x5 -k ruby_ptrace_setregs
+
+# ---------------------------------------------------------------
+# 5. Network Monitoring
+# ---------------------------------------------------------------
+
+# Monitor outbound connections from Ruby
+-a always,exit -F arch=b64 -S connect -F exe=/usr/bin/ruby -k ruby_connect
+-a always,exit -F arch=b64 -S connect -F exe=/usr/local/bin/ruby -k ruby_connect
+
+# Monitor socket creation
+-a always,exit -F arch=b64 -S socket -F exe=/usr/bin/ruby -k ruby_socket
+
+# Monitor bind (listener creation)
+-a always,exit -F arch=b64 -S bind -F exe=/usr/bin/ruby -k ruby_bind
+
+# ---------------------------------------------------------------
+# 6. File System Monitoring
+# ---------------------------------------------------------------
+
+# Monitor writes to temp directories
+-w /tmp -p wa -k ruby_tmp_write
+-w /var/tmp -p wa -k ruby_vartmp_write
+-w /dev/shm -p wa -k ruby_shm_write
+
+# Monitor Ruby gem directory changes
+-w /usr/lib/ruby/gems -p wa -k ruby_gem_modify
+-w /usr/local/lib/ruby/gems -p wa -k ruby_gem_modify
+
+# Monitor Ruby load path manipulation
+-w /usr/lib/ruby/site_ruby -p wa -k ruby_sitelib_modify
+
+# Monitor /proc/self/mem access (self-modification)
+-a always,exit -F arch=b64 -S open -F path=/proc/self/mem -k ruby_proc_mem
+-a always,exit -F arch=b64 -S openat -F path=/proc/self/mem -k ruby_proc_mem
+
+# Monitor /proc/*/maps access (memory layout reconnaissance)
+-a always,exit -F arch=b64 -S openat -F dir=/proc -F name=maps -k ruby_proc_maps
+
+# ---------------------------------------------------------------
+# 7. Credential Access
+# ---------------------------------------------------------------
+
+# Monitor access to sensitive files from Ruby processes
+-a always,exit -F arch=b64 -S openat -F path=/etc/shadow -F exe=/usr/bin/ruby -k ruby_shadow_access
+-a always,exit -F arch=b64 -S openat -F path=/etc/passwd -F exe=/usr/bin/ruby -k ruby_passwd_access
+-a always,exit -F arch=b64 -S openat -F dir=/home -F name=.ssh -F exe=/usr/bin/ruby -k ruby_ssh_access

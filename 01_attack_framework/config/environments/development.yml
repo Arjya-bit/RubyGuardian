@@ -1,0 +1,20 @@
+# Development environment settings
+environment: development
+
+logging:
+  level: debug
+  format: pretty
+  console: true
+
+safety:
+  require_confirmation: false
+  dry_run: true
+  sandbox_check: false
+
+network:
+  c2_host: "127.0.0.1"
+  c2_port: 4444
+  allowed_targets:
+    - "127.0.0.1"
+    - "localhost"
+    - "172.17.0.0/16"

@@ -1,0 +1,57 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ruby ">= 3.1.0"
+
+# Core forensics dependencies
+gem "ffi", "~> 1.16"              # Native memory access and system calls
+gem "bindata", "~> 2.4"           # Binary data parsing for memory structures
+gem "fiddle", "~> 1.1"            # Dynamic library bindings (ptrace, libc)
+
+# Memory analysis
+gem "objspace", "~> 0.1"          # Ruby ObjectSpace introspection
+gem "rbspy", "~> 0.17"            # Ruby process profiling
+
+# Pattern matching and detection
+gem "yara", "~> 1.3"              # YARA rule engine for IOC scanning
+gem "re2", "~> 2.4"               # Fast regex engine for string extraction
+
+# Data processing
+gem "json", "~> 2.7"
+gem "yaml", "~> 0.3"
+gem "zlib", "~> 3.1"              # Compressed dump handling
+gem "zstd-ruby", "~> 1.5"         # Zstandard compression support
+gem "digest", "~> 3.1"            # Cryptographic hashing for chain of custody
+
+# Reporting
+gem "erb", "~> 4.0"               # HTML report templates
+gem "rouge", "~> 4.2"             # Syntax highlighting for code reconstruction
+gem "terminal-table", "~> 3.0"    # CLI output formatting
+
+# Network analysis
+gem "ipaddr", "~> 1.2"            # IP address parsing and classification
+gem "resolv", "~> 0.3"            # DNS resolution for network artifacts
+gem "maxminddb", "~> 0.1"         # GeoIP lookups for IP enrichment
+
+# Configuration and logging
+gem "logger", "~> 1.6"
+gem "fileutils", "~> 1.7"
+gem "optparse", "~> 0.4"
+
+# CLI interface
+gem "thor", "~> 1.3"
+gem "pastel", "~> 0.8"
+gem "tty-progressbar", "~> 0.18"
+
+group :development, :test do
+  gem "rspec", "~> 3.13"
+  gem "rspec-mocks", "~> 3.13"
+  gem "simplecov", "~> 0.22"
+  gem "rubocop", "~> 1.59"
+  gem "rubocop-rspec", "~> 2.25"
+  gem "pry", "~> 0.14"
+  gem "pry-byebug", "~> 3.10"
+  gem "factory_bot", "~> 6.4"
+  gem "webmock", "~> 3.19"
+end

@@ -1,0 +1,42 @@
+# =============================================================================
+# RubyGuardian - Logstash Configuration
+# =============================================================================
+
+node.name: "rg-logstash-node-1"
+
+# Path settings
+path.data: /usr/share/logstash/data
+path.logs: /usr/share/logstash/logs
+path.config: /usr/share/logstash/pipeline
+
+# Pipeline settings
+pipeline.workers: 4
+pipeline.batch.size: 250
+pipeline.batch.delay: 50
+pipeline.ordered: auto
+
+# Queue settings (persistent queue for reliability)
+queue.type: persisted
+queue.max_bytes: 1gb
+queue.checkpoint.writes: 1024
+queue.drain: true
+
+# Dead letter queue for failed events
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 512mb
+
+# HTTP API
+http.host: "0.0.0.0"
+http.port: 9600
+
+# Monitoring
+monitoring.enabled: true
+monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+monitoring.elasticsearch.username: "elastic"
+monitoring.elasticsearch.password: "${ELASTIC_PASSWORD}"
+
+# Logging
+log.level: info
+log.format: json
+slowlog.threshold.warn: 2s
+slowlog.threshold.info: 1s

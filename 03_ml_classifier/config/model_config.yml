@@ -1,0 +1,93 @@
+# RubyGuardian ML Classifier - Model Configuration
+
+version: "0.3.0"
+
+# Classification labels
+labels:
+  binary:
+    - benign
+    - malicious
+  threat_categories:
+    - reverse_shell
+    - process_injection
+    - exfiltration
+    - persistence
+    - obfuscated
+    - clean
+
+# Random Forest configuration
+random_forest:
+  n_estimators: 500
+  max_depth: 30
+  min_samples_split: 5
+  min_samples_leaf: 2
+  max_features: "sqrt"
+  class_weight: "balanced"
+  n_jobs: -1
+  random_state: 42
+  bootstrap: true
+  oob_score: true
+
+# XGBoost Gradient Boosting configuration
+gradient_boost:
+  n_estimators: 300
+  max_depth: 8
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 3
+  gamma: 0.1
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  scale_pos_weight: 1.0
+  objective: "multi:softprob"
+  eval_metric: "mlogloss"
+  tree_method: "hist"
+  random_state: 42
+  early_stopping_rounds: 20
+
+# Neural Network (PyTorch) configuration
+neural_network:
+  architecture:
+    input_dim: null  # Set dynamically based on feature count
+    hidden_layers:
+      - 256
+      - 128
+      - 64
+    dropout_rates:
+      - 0.3
+      - 0.3
+      - 0.2
+    activation: "relu"
+    output_activation: "softmax"
+    batch_norm: true
+  training:
+    batch_size: 64
+    epochs: 100
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    optimizer: "adam"
+    scheduler:
+      type: "cosine_annealing"
+      T_max: 100
+      eta_min: 0.00001
+    early_stopping:
+      patience: 15
+      min_delta: 0.001
+
+# Ensemble configuration
+ensemble:
+  voting: "soft"
+  weights:
+    random_forest: 0.3
+    gradient_boost: 0.4
+    neural_network: 0.3
+  confidence_threshold: 0.7
+  fallback_strategy: "most_conservative"
+
+# Model serving
+serving:
+  max_batch_size: 100
+  timeout_seconds: 30
+  cache_predictions: true
+  cache_ttl_seconds: 300

@@ -1,0 +1,37 @@
+# RubyGuardian Phase 4 - Memory Forensics Toolkit
+# Python dependencies for Volatility plugins and analysis tools
+
+# Volatility 3 framework for memory forensics
+volatility3>=2.5.0,<3.0.0
+
+# YARA for pattern matching and IOC scanning
+yara-python>=4.3.0,<5.0.0
+
+# Data analysis and visualization
+capstone>=5.0.0        # Disassembly framework
+pefile>=2023.2.7       # PE file parsing (Windows dumps)
+pyelftools>=0.30       # ELF parsing (Linux dumps)
+
+# Hex and binary utilities
+hexdump>=3.3
+construct>=2.10.68     # Binary data parsing
+
+# Network artifact analysis
+dpkt>=1.9.8            # Packet parsing
+scapy>=2.5.0           # Network protocol analysis
+
+# Report generation
+jinja2>=3.1.2          # Template engine for reports
+matplotlib>=3.7.0      # Visualization
+networkx>=3.1          # Graph analysis for object relationships
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Utilities
+pyyaml>=6.0.1
+rich>=13.5.0           # Terminal output formatting
+tqdm>=4.66.0           # Progress bars
+python-dateutil>=2.8.2

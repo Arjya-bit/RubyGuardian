@@ -1,0 +1,38 @@
+# =============================================================================
+# RubyGuardian - Dashboard Service
+# =============================================================================
+# Exposes the unified dashboard (React UI, Kibana, Grafana) via NodePort
+# so operators can reach it from outside the cluster during research.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-svc
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/component: visualization
+    app.kubernetes.io/part-of: rubyguardian
+  annotations:
+    description: "NodePort service for the RubyGuardian dashboard UI"
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: dashboard
+  ports:
+    - name: http-ui
+      port: 5173
+      targetPort: http-ui
+      nodePort: 30173
+      protocol: TCP
+    - name: http-kibana
+      port: 5601
+      targetPort: http-kibana
+      nodePort: 30561
+      protocol: TCP
+    - name: http-grafana
+      port: 3000
+      targetPort: http-grafana
+      nodePort: 30300
+      protocol: TCP

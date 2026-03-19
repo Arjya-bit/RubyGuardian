@@ -1,0 +1,51 @@
+# RubyGuardian Attack Framework Configuration
+# WARNING: Educational use only in controlled environments
+
+general:
+  environment: sandbox
+  log_level: info
+  log_file: logs/attack_framework.log
+  require_confirmation: true
+  safety_checks: true
+
+c2_server:
+  host: "127.0.0.1"
+  port: 4444
+  protocol: http
+  secret_key: "change-me-in-lab"
+  beacon_interval: 30
+  jitter_percent: 20
+  max_retries: 3
+
+process_hollowing:
+  enabled: true
+  target_process:
+    windows: "C:\\Windows\\System32\\notepad.exe"
+    linux: "/bin/sleep"
+  payload: "benign_calc"
+  timeout: 30
+  cleanup_after: true
+
+cicd_poisoning:
+  enabled: true
+  gem_server: "http://127.0.0.1:9292"
+  target_pipeline: "local_simulation"
+  exfil_endpoint: "http://127.0.0.1:4444/exfil"
+
+lolruby:
+  enabled: true
+  techniques:
+    - reconnaissance
+    - credential_access
+    - exfiltration
+    - execution
+    - persistence
+    - defense_evasion
+  network_target: "127.0.0.1"
+  exfil_dns_server: "127.0.0.1"
+
+objectspace:
+  enabled: true
+  target_app: "http://127.0.0.1:3000"
+  persistence_method: "gc_anchor"
+  stealth_level: high

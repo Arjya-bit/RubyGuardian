@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ruby-guardian"
+version = "1.0.0"
+description = "Ruby Security Research Framework - ML Classifier & Forensics"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "RubyGuardian Project"}
+]
+keywords = ["security", "ruby", "malware", "detection", "forensics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["03_ml_classifier/tests", "04_memory_forensics/specs"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 120

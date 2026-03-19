@@ -1,0 +1,189 @@
+# RubyGuardian - ObjectSpace Anomaly Detection Signatures
+# =======================================================
+# Detects manipulation of Ruby's ObjectSpace, including monkey-patching
+# of core classes, method redefinition, and allocation anomalies that
+# indicate runtime tampering.
+
+signatures:
+  - id: OS-001
+    name: "Core Class Method Redefinition"
+    description: >
+      Detects redefinition of methods on critical Ruby core classes
+      (Kernel, IO, File, Process) which could intercept or modify
+      security-sensitive operations.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1562.001
+    indicators:
+      objectspace:
+        event: method_redefined
+        target_classes:
+          - Kernel
+          - IO
+          - File
+          - Process
+          - Socket
+          - Net::HTTP
+        target_methods:
+          - system
+          - exec
+          - spawn
+          - open
+          - popen
+          - eval
+          - require
+          - load
+          - connect
+    score: 95
+    tags: [objectspace, monkey_patch, method_redefinition]
+
+  - id: OS-002
+    name: "Method Aliasing for Interception"
+    description: >
+      Detects the pattern of aliasing a method and replacing it with
+      a wrapper, commonly used to intercept and modify behavior.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1562.001
+    indicators:
+      objectspace:
+        event: method_aliased
+        pattern:
+          - alias_method
+          - define_method
+        on_protected_class: true
+    score: 85
+    tags: [objectspace, alias_interception]
+
+  - id: OS-003
+    name: "Singleton Method Injection"
+    description: >
+      Detects injection of singleton methods on existing objects,
+      particularly on global objects like STDOUT, STDERR, or $stdin.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1574
+    indicators:
+      objectspace:
+        event: singleton_method_added
+        target_objects:
+          - STDOUT
+          - STDERR
+          - STDIN
+          - "$stdin"
+          - "$stdout"
+          - "$stderr"
+    score: 82
+    tags: [objectspace, singleton_injection]
+
+  - id: OS-004
+    name: "Unusual Object Allocation Spike"
+    description: >
+      Detects sudden spikes in object allocation rates that could
+      indicate heap spraying or memory manipulation attempts.
+    severity: medium
+    mitre_attack:
+      tactic: execution
+      technique: T1059.001
+    indicators:
+      objectspace:
+        event: allocation_spike
+        threshold_multiplier: 5.0  # 5x normal rate
+        window_seconds: 10
+        target_types:
+          - String
+          - Array
+          - Hash
+          - Proc
+    score: 60
+    tags: [objectspace, allocation_anomaly, heap_spray]
+
+  - id: OS-005
+    name: "Binding Object Extraction"
+    description: >
+      Detects extraction of Binding objects from other contexts,
+      which allows access to local variables and code execution
+      in the target scope.
+    severity: high
+    mitre_attack:
+      tactic: credential-access
+      technique: T1552
+    indicators:
+      ruby_api:
+        methods_called:
+          - binding
+          - send(:binding)
+        combined_with:
+          - eval
+          - instance_eval
+      objectspace:
+        event: binding_accessed
+        cross_scope: true
+    score: 78
+    tags: [objectspace, binding_extraction]
+
+  - id: OS-006
+    name: "Refinements Abuse"
+    description: >
+      Detects unusual use of Ruby refinements to secretly modify
+      class behavior in specific scopes without affecting global state,
+      making detection harder.
+    severity: medium
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1562
+    indicators:
+      ruby_api:
+        methods_called:
+          - refine
+          - using
+        on_protected_class: true
+      objectspace:
+        event: refinement_activated
+    score: 65
+    tags: [objectspace, refinements, stealth_modification]
+
+  - id: OS-007
+    name: "GC Manipulation"
+    description: >
+      Detects disabling or manipulation of Ruby's garbage collector,
+      which could be used to prevent cleanup of injected objects or
+      to stabilize heap layout for exploitation.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1562.001
+    indicators:
+      ruby_api:
+        methods_called:
+          - GC.disable
+          - GC.stress=
+          - GC.compact
+        suspicious_context: true
+    score: 75
+    tags: [objectspace, gc_manipulation]
+
+  - id: OS-008
+    name: "TracePoint Surveillance"
+    description: >
+      Detects installation of TracePoint hooks that monitor method calls,
+      which could be used for reconnaissance or to intercept security checks.
+    severity: medium
+    mitre_attack:
+      tactic: collection
+      technique: T1056
+    indicators:
+      ruby_api:
+        classes_used:
+          - TracePoint
+        events_monitored:
+          - call
+          - c_call
+          - return
+          - raise
+          - b_call
+    score: 55
+    tags: [objectspace, tracepoint, surveillance]

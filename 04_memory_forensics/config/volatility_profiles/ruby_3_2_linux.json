@@ -1,0 +1,318 @@
+{
+  "profile_name": "ruby_3_2_linux",
+  "ruby_version": "3.2.x",
+  "platform": "linux",
+  "architecture": "x86_64",
+  "description": "Volatility profile for Ruby 3.2.x on Linux x86_64. Contains structure offsets and sizes for parsing Ruby VM internals from memory dumps.",
+  "abi": {
+    "pointer_size": 8,
+    "alignment": 8,
+    "endianness": "little"
+  },
+  "structures": {
+    "RBasic": {
+      "size": 16,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "VALUE" },
+        "klass": { "offset": 8, "size": 8, "type": "VALUE" }
+      }
+    },
+    "RObject": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "numiv": { "offset": 16, "size": 4, "type": "uint32_t" },
+            "ivptr": { "offset": 24, "size": 8, "type": "VALUE*" },
+            "iv_index_tbl": { "offset": 32, "size": 8, "type": "void*" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      }
+    },
+    "RString": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long" },
+            "ptr": { "offset": 24, "size": 8, "type": "char*" },
+            "aux": {
+              "capa": { "offset": 32, "size": 8, "type": "long" }
+            }
+          },
+          "embed": {
+            "len_and_terminator": { "offset": 16, "size": 8, "type": "long" },
+            "ary": { "offset": 24, "size": 16, "type": "char[]" }
+          }
+        }
+      },
+      "flags": {
+        "STR_NOEMBED": "0x2000",
+        "STR_SHARED": "0x4000",
+        "STR_FROZEN": "0x8000",
+        "EMBED_LEN_MASK": "0x1f0000",
+        "EMBED_LEN_SHIFT": 16
+      }
+    },
+    "RArray": {
+      "size": 40,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "as": {
+          "heap": {
+            "len": { "offset": 16, "size": 8, "type": "long" },
+            "aux": {
+              "capa": { "offset": 24, "size": 8, "type": "long" }
+            },
+            "ptr": { "offset": 32, "size": 8, "type": "VALUE*" }
+          },
+          "ary": {
+            "values": { "offset": 16, "size": 24, "type": "VALUE[3]" }
+          }
+        }
+      },
+      "flags": {
+        "ARY_EMBED_FLAG": "0x2000",
+        "ARY_EMBED_LEN_MASK": "0x60000",
+        "ARY_EMBED_LEN_SHIFT": 17
+      }
+    },
+    "RHash": {
+      "size": 56,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "ifnone": { "offset": 16, "size": 8, "type": "VALUE" },
+        "ntbl": { "offset": 24, "size": 8, "type": "st_table*" },
+        "iter_lev": { "offset": 32, "size": 4, "type": "int" }
+      }
+    },
+    "RClass": {
+      "size": 64,
+      "fields": {
+        "basic": { "offset": 0, "size": 16, "type": "RBasic" },
+        "super": { "offset": 16, "size": 8, "type": "VALUE" },
+        "ptr": { "offset": 24, "size": 8, "type": "rb_classext_t*" },
+        "class_serial": { "offset": 32, "size": 8, "type": "uint64_t" }
+      }
+    },
+    "rb_iseq_t": {
+      "size": 200,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "VALUE" },
+        "body": { "offset": 8, "size": 8, "type": "rb_iseq_constant_body*" }
+      },
+      "comment": "Instruction sequence - contains compiled Ruby bytecode"
+    },
+    "rb_iseq_constant_body": {
+      "size": 312,
+      "fields": {
+        "type": { "offset": 0, "size": 4, "type": "enum iseq_type" },
+        "iseq_size": { "offset": 4, "size": 4, "type": "unsigned int" },
+        "iseq_encoded": { "offset": 8, "size": 8, "type": "VALUE*" },
+        "param": {
+          "flags": { "offset": 16, "size": 4, "type": "uint32_t" },
+          "lead_num": { "offset": 20, "size": 4, "type": "int" },
+          "opt_num": { "offset": 24, "size": 4, "type": "int" }
+        },
+        "location": {
+          "pathobj": { "offset": 48, "size": 8, "type": "VALUE" },
+          "base_label": { "offset": 56, "size": 8, "type": "VALUE" },
+          "label": { "offset": 64, "size": 8, "type": "VALUE" },
+          "first_lineno": { "offset": 72, "size": 4, "type": "int" },
+          "node_id": { "offset": 76, "size": 4, "type": "int" }
+        },
+        "local_table_size": { "offset": 80, "size": 4, "type": "unsigned int" },
+        "local_table": { "offset": 88, "size": 8, "type": "ID*" },
+        "insns_info": { "offset": 96, "size": 8, "type": "void*" },
+        "insns_info_size": { "offset": 104, "size": 4, "type": "unsigned int" }
+      }
+    },
+    "rb_vm_t": {
+      "size": 2048,
+      "fields": {
+        "running_thread": { "offset": 0, "size": 8, "type": "rb_thread_t*" },
+        "ractor": {
+          "cnt": { "offset": 16, "size": 4, "type": "int" }
+        },
+        "objspace": { "offset": 48, "size": 8, "type": "rb_objspace_t*" },
+        "loading_table": { "offset": 56, "size": 8, "type": "st_table*" },
+        "frozen_strings": { "offset": 64, "size": 8, "type": "st_table*" }
+      }
+    },
+    "rb_thread_t": {
+      "size": 1024,
+      "fields": {
+        "self": { "offset": 0, "size": 8, "type": "VALUE" },
+        "vm": { "offset": 8, "size": 8, "type": "rb_vm_t*" },
+        "cfp": { "offset": 16, "size": 8, "type": "rb_control_frame_t*" },
+        "ec": { "offset": 24, "size": 8, "type": "rb_execution_context_t*" },
+        "status": { "offset": 32, "size": 4, "type": "int" },
+        "priority": { "offset": 36, "size": 4, "type": "int" },
+        "native_thread_id": { "offset": 40, "size": 8, "type": "pthread_t" }
+      }
+    },
+    "rb_control_frame_t": {
+      "size": 48,
+      "fields": {
+        "pc": { "offset": 0, "size": 8, "type": "VALUE*" },
+        "sp": { "offset": 8, "size": 8, "type": "VALUE*" },
+        "iseq": { "offset": 16, "size": 8, "type": "rb_iseq_t*" },
+        "self": { "offset": 24, "size": 8, "type": "VALUE" },
+        "ep": { "offset": 32, "size": 8, "type": "VALUE*" },
+        "block_code": { "offset": 40, "size": 8, "type": "void*" }
+      }
+    },
+    "rb_objspace_t": {
+      "size": 4096,
+      "fields": {
+        "flags": { "offset": 0, "size": 8, "type": "unsigned long" },
+        "heap_pages": {
+          "sorted": { "offset": 16, "size": 8, "type": "rb_heap_page_t**" },
+          "sorted_length": { "offset": 24, "size": 4, "type": "int" },
+          "allocated_pages": { "offset": 28, "size": 4, "type": "int" }
+        },
+        "total_allocated_objects": { "offset": 48, "size": 8, "type": "size_t" },
+        "total_freed_objects": { "offset": 56, "size": 8, "type": "size_t" },
+        "malloc_increase": { "offset": 64, "size": 8, "type": "size_t" }
+      }
+    },
+    "rb_heap_page_t": {
+      "size": 80,
+      "fields": {
+        "flags": { "offset": 0, "size": 2, "type": "unsigned short" },
+        "total_slots": { "offset": 2, "size": 2, "type": "unsigned short" },
+        "free_slots": { "offset": 4, "size": 2, "type": "unsigned short" },
+        "final_slots": { "offset": 6, "size": 2, "type": "unsigned short" },
+        "start": { "offset": 8, "size": 8, "type": "RVALUE*" },
+        "freelist": { "offset": 16, "size": 8, "type": "RVALUE*" },
+        "prev": { "offset": 24, "size": 8, "type": "rb_heap_page_t*" },
+        "next": { "offset": 32, "size": 8, "type": "rb_heap_page_t*" },
+        "body": { "offset": 40, "size": 8, "type": "rb_heap_page_body_t*" }
+      },
+      "constants": {
+        "HEAP_PAGE_OBJ_LIMIT": 409,
+        "HEAP_PAGE_SIZE": 16384,
+        "RVALUE_SIZE": 40
+      }
+    }
+  },
+  "symbols": {
+    "ruby_current_vm_ptr": {
+      "description": "Global pointer to the current Ruby VM instance",
+      "type": "rb_vm_t*"
+    },
+    "ruby_current_execution_context_ptr": {
+      "description": "Thread-local pointer to current execution context",
+      "type": "rb_execution_context_t*"
+    }
+  },
+  "instructions": {
+    "comment": "Ruby 3.2 YARV instruction opcodes",
+    "opcodes": {
+      "0": "nop",
+      "1": "getlocal",
+      "2": "setlocal",
+      "3": "getblockparam",
+      "4": "setblockparam",
+      "5": "getblockparamproxy",
+      "6": "getspecial",
+      "7": "setspecial",
+      "8": "getinstancevariable",
+      "9": "setinstancevariable",
+      "10": "getclassvariable",
+      "11": "setclassvariable",
+      "12": "opt_getconstant_path",
+      "13": "getconstant",
+      "14": "setconstant",
+      "15": "getglobal",
+      "16": "setglobal",
+      "17": "putnil",
+      "18": "putself",
+      "19": "putobject",
+      "20": "putspecialobject",
+      "21": "putstring",
+      "22": "concatstrings",
+      "23": "anytostring",
+      "24": "toregexp",
+      "25": "intern",
+      "26": "newarray",
+      "27": "newarraykwsplat",
+      "28": "duparray",
+      "29": "duphash",
+      "30": "expandarray",
+      "31": "concatarray",
+      "32": "splatarray",
+      "33": "newhash",
+      "34": "newrange",
+      "35": "pop",
+      "36": "dup",
+      "37": "dupn",
+      "38": "swap",
+      "39": "opt_reverse",
+      "40": "topn",
+      "41": "setn",
+      "42": "adjuststack",
+      "43": "defined",
+      "44": "checkmatch",
+      "45": "checkkeyword",
+      "46": "checktype",
+      "47": "defineclass",
+      "48": "definemethod",
+      "49": "definesmethod",
+      "50": "send",
+      "51": "opt_send_without_block",
+      "52": "objtostring",
+      "53": "opt_str_freeze",
+      "54": "opt_nil_p",
+      "55": "opt_str_uminus",
+      "56": "opt_newarray_send",
+      "57": "invokesuper",
+      "58": "invokeblock",
+      "59": "leave",
+      "60": "throw",
+      "61": "jump",
+      "62": "branchif",
+      "63": "branchunless",
+      "64": "branchnil",
+      "65": "opt_aref",
+      "66": "opt_aset",
+      "67": "opt_aset_with",
+      "68": "opt_aref_with",
+      "69": "opt_length",
+      "70": "opt_size",
+      "71": "opt_empty_p",
+      "72": "opt_succ",
+      "73": "opt_not",
+      "74": "opt_plus",
+      "75": "opt_minus",
+      "76": "opt_mult",
+      "77": "opt_div",
+      "78": "opt_mod",
+      "79": "opt_eq",
+      "80": "opt_neq",
+      "81": "opt_lt",
+      "82": "opt_le",
+      "83": "opt_gt",
+      "84": "opt_ge",
+      "85": "opt_ltlt",
+      "86": "opt_and",
+      "87": "opt_or",
+      "88": "opt_regexpmatch2",
+      "89": "once",
+      "90": "opt_case_dispatch",
+      "91": "opt_invokebuiltin_delegate",
+      "92": "opt_invokebuiltin_delegate_leave",
+      "93": "getlocal_WC_0",
+      "94": "getlocal_WC_1",
+      "95": "setlocal_WC_0",
+      "96": "setlocal_WC_1",
+      "97": "putobject_INT2FIX_0_",
+      "98": "putobject_INT2FIX_1_"
+    }
+  }
+}

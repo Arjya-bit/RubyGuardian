@@ -1,0 +1,107 @@
+# =============================================================================
+# RubyGuardian - Docker Network Configuration
+# =============================================================================
+# Defines isolated network segments for the research lab environment.
+# Apply via: docker-compose -f docker-network-config.yml up
+# =============================================================================
+
+version: "3.9"
+
+networks:
+  # ---------------------------------------------------------------------------
+  # Internal service mesh - detection engine, ML classifier, forensics, ELK
+  # ---------------------------------------------------------------------------
+  rg-internal:
+    name: rg-internal
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-rg-internal
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+    labels:
+      project: rubyguardian
+      segment: internal
+      security.level: trusted
+
+  # ---------------------------------------------------------------------------
+  # Honeypot segment - isolated from internal services
+  # Only the honeypot and attacker containers attach here.
+  # ---------------------------------------------------------------------------
+  rg-honeypot:
+    name: rg-honeypot
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.0.0/16
+          gateway: 172.29.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-rg-honeypot
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.enable_icc: "true"
+    internal: true
+    labels:
+      project: rubyguardian
+      segment: honeypot
+      security.level: restricted
+
+  # ---------------------------------------------------------------------------
+  # Monitoring segment - ELK stack, dashboard, Prometheus, Grafana
+  # Exposed to the host for browser access.
+  # ---------------------------------------------------------------------------
+  rg-monitoring:
+    name: rg-monitoring
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-rg-monitor
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+    labels:
+      project: rubyguardian
+      segment: monitoring
+      security.level: trusted
+
+  # ---------------------------------------------------------------------------
+  # Attack simulation segment - fully isolated.
+  # Attacker containers operate here. No route to host network.
+  # ---------------------------------------------------------------------------
+  rg-attack-sim:
+    name: rg-attack-sim
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.31.0.0/16
+          gateway: 172.31.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-rg-attack
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.enable_icc: "true"
+    internal: true
+    labels:
+      project: rubyguardian
+      segment: attack-simulation
+      security.level: dangerous
+
+# =============================================================================
+# Service-to-network mapping reference
+# =============================================================================
+# detection-agent   -> rg-internal
+# ml-classifier-api -> rg-internal
+# forensics         -> rg-internal
+# elk-stack          -> rg-internal, rg-monitoring
+# dashboard          -> rg-monitoring
+# honeypot           -> rg-honeypot, rg-internal (one-way telemetry)
+# attacker           -> rg-attack-sim, rg-honeypot
+# target             -> rg-attack-sim, rg-internal
+# =============================================================================

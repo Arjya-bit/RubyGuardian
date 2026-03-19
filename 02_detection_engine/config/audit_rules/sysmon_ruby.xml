@@ -1,0 +1,129 @@
+<!--
+  RubyGuardian - Sysmon for Linux Configuration
+  ==============================================
+  Monitors Ruby process behavior for security-relevant events.
+  Install: sudo sysmon -accepteula -i sysmon_ruby.xml
+  Update:  sudo sysmon -c sysmon_ruby.xml
+-->
+<Sysmon schemaversion="4.81">
+  <HashAlgorithms>SHA256,IMPHASH</HashAlgorithms>
+  <CheckRevocation/>
+
+  <EventFiltering>
+
+    <!-- Rule Group 1: Process Creation (Event ID 1) -->
+    <RuleGroup name="RubyProcessCreation" groupRelation="or">
+      <ProcessCreate onmatch="include">
+        <!-- Ruby interpreter launches -->
+        <Image condition="contains">ruby</Image>
+        <Image condition="contains">bundle</Image>
+        <Image condition="contains">rails</Image>
+        <Image condition="contains">puma</Image>
+        <Image condition="contains">sidekiq</Image>
+
+        <!-- Suspicious child processes from Ruby -->
+        <ParentImage condition="contains">ruby</ParentImage>
+
+        <!-- Execution from temp directories -->
+        <Image condition="begin with">/tmp/</Image>
+        <Image condition="begin with">/var/tmp/</Image>
+        <Image condition="begin with">/dev/shm/</Image>
+
+        <!-- Shell spawned by Ruby -->
+        <ParentImage condition="contains">ruby</ParentImage>
+        <Image condition="is">/bin/sh</Image>
+        <Image condition="is">/bin/bash</Image>
+
+        <!-- Suspicious command lines -->
+        <CommandLine condition="contains">eval</CommandLine>
+        <CommandLine condition="contains">base64</CommandLine>
+        <CommandLine condition="contains">curl|sh</CommandLine>
+        <CommandLine condition="contains">wget -O -</CommandLine>
+      </ProcessCreate>
+    </RuleGroup>
+
+    <!-- Rule Group 2: File Creation (Event ID 11) -->
+    <RuleGroup name="RubyFileCreation" groupRelation="or">
+      <FileCreate onmatch="include">
+        <!-- Files created by Ruby in suspicious locations -->
+        <Image condition="contains">ruby</Image>
+        <TargetFilename condition="begin with">/tmp/</TargetFilename>
+
+        <Image condition="contains">ruby</Image>
+        <TargetFilename condition="begin with">/dev/shm/</TargetFilename>
+
+        <!-- Shared library creation by Ruby -->
+        <Image condition="contains">ruby</Image>
+        <TargetFilename condition="end with">.so</TargetFilename>
+
+        <!-- Script creation in temp dirs -->
+        <TargetFilename condition="begin with">/tmp/</TargetFilename>
+        <TargetFilename condition="end with">.rb</TargetFilename>
+
+        <TargetFilename condition="begin with">/tmp/</TargetFilename>
+        <TargetFilename condition="end with">.sh</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- Rule Group 3: Network Connections (Event ID 3) -->
+    <RuleGroup name="RubyNetworkActivity" groupRelation="or">
+      <NetworkConnect onmatch="include">
+        <!-- All outbound connections from Ruby processes -->
+        <Image condition="contains">ruby</Image>
+        <Initiated>true</Initiated>
+
+        <!-- High-risk destination ports -->
+        <Image condition="contains">ruby</Image>
+        <DestinationPort condition="is">4444</DestinationPort>
+
+        <Image condition="contains">ruby</Image>
+        <DestinationPort condition="is">8443</DestinationPort>
+
+        <Image condition="contains">ruby</Image>
+        <DestinationPort condition="is">1337</DestinationPort>
+      </NetworkConnect>
+    </RuleGroup>
+
+    <!-- Rule Group 4: Process Access / ptrace (Event ID 10) -->
+    <RuleGroup name="RubyProcessAccess" groupRelation="or">
+      <ProcessAccess onmatch="include">
+        <!-- Ruby process accessing other processes -->
+        <SourceImage condition="contains">ruby</SourceImage>
+        <GrantedAccess condition="is">0x1F0FFF</GrantedAccess>
+
+        <!-- Any process accessing Ruby with PROCESS_ALL_ACCESS -->
+        <TargetImage condition="contains">ruby</TargetImage>
+        <GrantedAccess condition="is">0x1F0FFF</GrantedAccess>
+
+        <!-- ptrace on Ruby processes -->
+        <SourceImage condition="contains">ruby</SourceImage>
+        <CallTrace condition="contains">ptrace</CallTrace>
+      </ProcessAccess>
+    </RuleGroup>
+
+    <!-- Rule Group 5: Image Load / Shared Library (Event ID 7) -->
+    <RuleGroup name="RubyImageLoad" groupRelation="or">
+      <ImageLoad onmatch="include">
+        <!-- Shared libraries loaded from temp dirs -->
+        <Image condition="contains">ruby</Image>
+        <ImageLoaded condition="begin with">/tmp/</ImageLoaded>
+
+        <Image condition="contains">ruby</Image>
+        <ImageLoaded condition="begin with">/dev/shm/</ImageLoaded>
+
+        <!-- Unsigned or unusual shared libraries -->
+        <Image condition="contains">ruby</Image>
+        <ImageLoaded condition="end with">.so</ImageLoaded>
+        <Signed>false</Signed>
+      </ImageLoad>
+    </RuleGroup>
+
+    <!-- Rule Group 6: Raw Access Read (Event ID 9) -->
+    <RuleGroup name="RubyRawAccess" groupRelation="or">
+      <RawAccessRead onmatch="include">
+        <Image condition="contains">ruby</Image>
+      </RawAccessRead>
+    </RuleGroup>
+
+  </EventFiltering>
+</Sysmon>

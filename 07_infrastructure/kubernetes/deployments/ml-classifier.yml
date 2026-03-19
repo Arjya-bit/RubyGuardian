@@ -1,0 +1,243 @@
+# =============================================================================
+# RubyGuardian - ML Classifier Deployment
+# =============================================================================
+# Deploys the machine-learning classification API that scores Ruby scripts
+# and behavioral telemetry as benign or malicious using an ensemble of
+# Random Forest, XGBoost, and a lightweight neural network.
+#
+# The API is stateless — the trained model is loaded from a PVC at startup.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-classifier
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/component: classification
+    app.kubernetes.io/part-of: rubyguardian
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    description: "Ensemble ML classifier API for Ruby malware detection"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ml-classifier
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ml-classifier
+        app.kubernetes.io/component: classification
+        app.kubernetes.io/part-of: rubyguardian
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: ml-classifier
+      terminationGracePeriodSeconds: 30
+
+      initContainers:
+        - name: init-validate-model
+          image: rubyguardian/ml-classifier:1.0.0
+          command:
+            - python
+            - -c
+            - |
+              import os, sys
+              model_dir = os.environ.get("MODEL_PATH", "/models")
+              required = ["random_forest.joblib", "xgboost_model.json", "scaler.joblib"]
+              missing = [f for f in required if not os.path.isfile(os.path.join(model_dir, f))]
+              if missing:
+                  print(f"WARNING: Missing model files: {missing}", file=sys.stderr)
+                  print("The API will start in training mode.")
+              else:
+                  print("All model files present. Ready to serve predictions.")
+          volumeMounts:
+            - name: model-storage
+              mountPath: /models
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+      containers:
+        - name: ml-classifier
+          image: rubyguardian/ml-classifier:1.0.0
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - uvicorn
+            - api.main:app
+            - --host=0.0.0.0
+            - --port=8000
+            - --workers=2
+            - --log-level=info
+
+          ports:
+            - name: http-api
+              containerPort: 8000
+              protocol: TCP
+
+          env:
+            - name: MODEL_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-config
+                  key: model_path
+            - name: CONFIDENCE_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-config
+                  key: confidence_threshold
+            - name: FEATURE_SET
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-config
+                  key: feature_set
+            - name: ELASTICSEARCH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-config
+                  key: elasticsearch_url
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rubyguardian-secrets
+                  key: classifier_api_key
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: ml-config
+                  key: log_level
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: model-storage
+              mountPath: /models
+              readOnly: true
+            - name: tmp-dir
+              mountPath: /tmp
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-api
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-api
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http-api
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: ml-model-storage
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: 500Mi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-classifier
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/part-of: rubyguardian
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-model-storage
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/part-of: rubyguardian
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ml-classifier-hpa
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: ml-classifier
+    app.kubernetes.io/part-of: rubyguardian
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ml-classifier
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

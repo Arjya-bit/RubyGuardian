@@ -1,0 +1,73 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ruby ">= 3.1.0"
+
+# Core framework
+gem "sinatra", "~> 3.1"
+gem "puma", "~> 6.4"
+gem "rack", "~> 3.0"
+
+# Network capture and analysis
+gem "pcaprub", "~> 0.13"
+gem "packetfu", "~> 2.0"
+gem "net-dns", "~> 0.20"
+
+# HTTP client for threat feeds
+gem "faraday", "~> 2.9"
+gem "faraday-retry", "~> 2.2"
+
+# Container management
+gem "docker-api", "~> 2.2"
+
+# Data storage and querying
+gem "sequel", "~> 5.77"
+gem "sqlite3", "~> 1.7"
+gem "redis", "~> 5.1"
+
+# JSON and YAML processing
+gem "oj", "~> 3.16"
+gem "psych", "~> 5.1"
+
+# Logging and monitoring
+gem "semantic_logger", "~> 4.15"
+gem "prometheus-client", "~> 4.2"
+
+# Security analysis
+gem "yara", "~> 1.3", require: false
+gem "digest-crc", "~> 0.6"
+
+# IP and network intelligence
+gem "maxmind-geoip2", "~> 1.2"
+gem "ipaddr"
+gem "resolv"
+
+# Template rendering for decoys
+gem "erb"
+gem "tilt", "~> 2.3"
+
+# Background job processing
+gem "concurrent-ruby", "~> 1.2"
+
+# Report generation
+gem "prawn", "~> 2.4"
+gem "terminal-table", "~> 3.0"
+
+group :development, :test do
+  gem "rspec", "~> 3.13"
+  gem "webmock", "~> 3.19"
+  gem "rack-test", "~> 2.1"
+  gem "factory_bot", "~> 6.4"
+  gem "faker", "~> 3.2"
+  gem "rubocop", "~> 1.62"
+  gem "rubocop-rspec", "~> 2.27"
+  gem "simplecov", "~> 0.22"
+  gem "timecop", "~> 0.9"
+  gem "vcr", "~> 6.2"
+end
+
+group :test do
+  gem "rspec-mocks", "~> 3.13"
+  gem "database_cleaner-sequel", "~> 2.0"
+end

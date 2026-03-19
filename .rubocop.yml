@@ -1,0 +1,40 @@
+AllCops:
+  TargetRubyVersion: 3.0
+  NewCops: enable
+  Exclude:
+    - 'vendor/**/*'
+    - 'node_modules/**/*'
+    - '01_attack_framework/1b_cicd_poisoning/poisoned_gems/**/*'
+    - '01_attack_framework/1d_objectspace_persistence/target_apps/**/*'
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+Metrics/MethodLength:
+  Max: 30
+  Exclude:
+    - 'specs/**/*'
+    - '09_testing/**/*'
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/BlockLength:
+  Exclude:
+    - 'specs/**/*'
+    - '09_testing/**/*'
+    - '**/*.gemspec'
+
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - 'specs/**/*'
+
+Naming/FileName:
+  Exclude:
+    - 'Gemfile'
+    - 'Rakefile'
+    - 'Guardfile'

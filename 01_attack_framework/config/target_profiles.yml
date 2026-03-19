@@ -1,0 +1,40 @@
+# Target Platform Profiles
+
+profiles:
+  linux_x64:
+    os: linux
+    arch: x86_64
+    ruby_version: "3.2+"
+    syscalls:
+      process_create: "fork/execve"
+      memory_alloc: "mmap"
+      memory_write: "process_vm_writev"
+      trace: "ptrace"
+    paths:
+      ruby: "/usr/bin/ruby"
+      shell: "/bin/bash"
+      tmp: "/tmp"
+      proc: "/proc"
+
+  windows_x64:
+    os: windows
+    arch: x86_64
+    ruby_version: "3.2+"
+    apis:
+      process_create: "CreateProcessW"
+      memory_alloc: "VirtualAllocEx"
+      memory_write: "WriteProcessMemory"
+      thread_context: "SetThreadContext"
+    paths:
+      ruby: 'C:\Ruby32-x64\bin\ruby.exe'
+      target: 'C:\Windows\System32\notepad.exe'
+
+  docker_linux:
+    os: linux
+    arch: x86_64
+    ruby_version: "3.2+"
+    container: true
+    restrictions:
+      - "no_ptrace_by_default"
+      - "limited_proc_access"
+    notes: "Requires --cap-add=SYS_PTRACE for process hollowing"

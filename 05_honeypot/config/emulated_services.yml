@@ -1,0 +1,270 @@
+# RubyGuardian Phase 5 - Emulated Services Configuration
+# Defines the decoy services deployed by the honeypot system
+
+services:
+  # Fake Ruby on Rails Application
+  fake_rails_app:
+    enabled: true
+    name: "Internal Admin Portal"
+    description: "Simulates a vulnerable Rails application with exposed admin interface"
+    container:
+      image: "rubyguardian/fake-rails-app:latest"
+      dockerfile: "decoy_apps/fake_rails_app/Dockerfile"
+      build_context: "decoy_apps/fake_rails_app"
+
+    network:
+      ports:
+        - host: 3000
+          container: 3000
+          protocol: "tcp"
+        - host: 3443
+          container: 3443
+          protocol: "tcp"
+      hostname: "admin-portal.internal"
+
+    emulation:
+      rails_version: "7.0.8"
+      ruby_version: "3.2.2"
+      server_header: "Puma/6.4.0 (ruby/3.2.2)"
+      x_powered_by: "Phusion Passenger 6.0.18"
+
+      # Exposed endpoints that attract attackers
+      exposed_endpoints:
+        - path: "/admin"
+          method: "GET"
+          description: "Admin dashboard with fake session management"
+          response_delay_ms: 150
+        - path: "/admin/login"
+          method: "POST"
+          description: "Login form that accepts and logs credentials"
+          response_delay_ms: 800
+        - path: "/api/v1/users"
+          method: "GET"
+          description: "User listing API with fake data"
+          response_delay_ms: 200
+        - path: "/api/v1/users/:id"
+          method: "GET"
+          description: "User detail with SQL injection bait"
+          response_delay_ms: 100
+        - path: "/api/v1/exec"
+          method: "POST"
+          description: "Debug endpoint that pretends to eval code"
+          response_delay_ms: 50
+        - path: "/rails/info/routes"
+          method: "GET"
+          description: "Rails routes info page (development mode leak)"
+        - path: "/rails/info/properties"
+          method: "GET"
+          description: "Rails properties info page"
+        - path: "/sidekiq"
+          method: "GET"
+          description: "Exposed Sidekiq dashboard"
+        - path: "/.env"
+          method: "GET"
+          description: "Leaked environment file with fake credentials"
+        - path: "/config/database.yml"
+          method: "GET"
+          description: "Leaked database configuration"
+        - path: "/wp-admin"
+          method: "GET"
+          description: "WordPress admin redirect trap"
+        - path: "/phpmyadmin"
+          method: "GET"
+          description: "phpMyAdmin redirect trap"
+
+      # Fake error pages that leak information
+      error_responses:
+        404:
+          template: "rails_404_debug"
+          leak_stack_trace: true
+          leak_gem_versions: true
+        500:
+          template: "rails_500_debug"
+          leak_stack_trace: true
+          leak_database_info: true
+          leak_environment: true
+
+      # Deliberately weak security headers
+      security_headers:
+        x_frame_options: null  # deliberately missing
+        content_security_policy: null
+        strict_transport_security: null
+        x_content_type_options: "nosniff"
+
+    vulnerabilities:
+      - type: "sql_injection"
+        endpoint: "/api/v1/users/:id"
+        parameter: "id"
+        fake_response: "simulated_sql_error"
+      - type: "command_injection"
+        endpoint: "/api/v1/exec"
+        parameter: "cmd"
+        fake_response: "simulated_command_output"
+      - type: "path_traversal"
+        endpoint: "/api/v1/files"
+        parameter: "path"
+        fake_response: "simulated_file_content"
+      - type: "ssrf"
+        endpoint: "/api/v1/fetch"
+        parameter: "url"
+        fake_response: "simulated_ssrf_response"
+      - type: "deserialization"
+        endpoint: "/api/v1/import"
+        parameter: "data"
+        fake_response: "simulated_marshal_load"
+
+  # Fake RubyGems Server
+  fake_gem_server:
+    enabled: true
+    name: "Internal Gem Repository"
+    description: "Simulates a private gem server to detect dependency confusion attacks"
+    container:
+      image: "rubyguardian/fake-gem-server:latest"
+      dockerfile: "decoy_apps/fake_gem_server/Dockerfile"
+      build_context: "decoy_apps/fake_gem_server"
+
+    network:
+      ports:
+        - host: 9292
+          container: 9292
+          protocol: "tcp"
+      hostname: "gems.internal"
+
+    emulation:
+      server_type: "geminabox"
+      server_version: "3.0.0"
+
+      # Fake internal gems that might be targeted
+      hosted_gems:
+        - name: "internal-auth"
+          version: "2.1.0"
+          description: "Internal authentication library"
+          dependencies:
+            - "bcrypt ~> 3.1"
+            - "jwt ~> 2.7"
+        - name: "company-utils"
+          version: "1.5.3"
+          description: "Shared utility functions"
+          dependencies:
+            - "activesupport ~> 7.0"
+        - name: "deploy-tools"
+          version: "3.0.1"
+          description: "Deployment automation tools"
+          dependencies:
+            - "net-ssh ~> 7.2"
+            - "capistrano ~> 3.18"
+        - name: "api-client"
+          version: "4.2.0"
+          description: "Internal API client library"
+          dependencies:
+            - "faraday ~> 2.9"
+            - "oj ~> 3.16"
+
+      exposed_endpoints:
+        - path: "/gems"
+          method: "GET"
+          description: "Gem listing"
+        - path: "/api/v1/gems"
+          method: "GET"
+          description: "Gem API listing"
+        - path: "/upload"
+          method: "POST"
+          description: "Gem upload endpoint - captures malicious gems"
+        - path: "/api/v1/gems/:name"
+          method: "GET"
+          description: "Gem detail endpoint"
+        - path: "/quick/Marshal.4.8/:name"
+          method: "GET"
+          description: "RubyGems marshalled spec endpoint"
+
+  # Fake CI/CD Runner
+  fake_ci_runner:
+    enabled: true
+    name: "Build Runner Agent"
+    description: "Simulates a CI/CD runner with exposed secrets and build artifacts"
+    container:
+      image: "rubyguardian/fake-ci-runner:latest"
+      dockerfile: "decoy_apps/fake_ci_runner/Dockerfile"
+      build_context: "decoy_apps/fake_ci_runner"
+
+    network:
+      ports:
+        - host: 8080
+          container: 8080
+          protocol: "tcp"
+      hostname: "runner-01.ci.internal"
+
+    emulation:
+      runner_type: "gitlab-runner"
+      runner_version: "16.8.0"
+
+      # Fake environment variables visible to attackers
+      environment_variables:
+        CI: "true"
+        CI_SERVER: "yes"
+        GITLAB_CI: "true"
+        CI_PROJECT_NAME: "internal-webapp"
+        CI_PIPELINE_ID: "847291"
+        CI_COMMIT_SHA: "a1b2c3d4e5f6"
+        RAILS_ENV: "production"
+        DATABASE_URL: "postgres://deploy:D3pl0y$ecret@db.internal:5432/webapp_prod"
+        REDIS_URL: "redis://cache.internal:6379/0"
+        SECRET_KEY_BASE: "f4k3s3cr3tk3yb4s3th4t1sv3ryl0ng4ndc0mpl3x123456789"
+        AWS_ACCESS_KEY_ID: "AKIAFAKE1234567890AB"
+        AWS_SECRET_ACCESS_KEY: "fAkEsEcReTkEy1234567890abcdefghijklmnop"
+        GITHUB_TOKEN: "ghp_fake1234567890abcdefghijklmnopqrstuv"
+        DOCKER_REGISTRY_PASSWORD: "d0ck3r_r3g1stry_p4ssw0rd"
+        SLACK_BOT_TOKEN: "xoxb-fake-1234567890-abcdefghijklmnop"
+
+      exposed_endpoints:
+        - path: "/api/v4/runners"
+          method: "GET"
+          description: "Runner status API"
+        - path: "/api/v4/jobs"
+          method: "GET"
+          description: "Job listing with build logs"
+        - path: "/api/v4/jobs/:id/artifacts"
+          method: "GET"
+          description: "Build artifact download"
+        - path: "/api/v4/projects/:id/variables"
+          method: "GET"
+          description: "Project variables (secrets)"
+        - path: "/builds/:id/log"
+          method: "GET"
+          description: "Build log with leaked secrets"
+
+      # Fake build artifacts that contain canary data
+      artifacts:
+        - name: "deploy-bundle.tar.gz"
+          contents: "canary_deploy_artifact"
+        - name: ".env.production"
+          contents: "canary_env_file"
+        - name: "id_deploy"
+          contents: "canary_ssh_deploy_key"
+
+# Global service settings
+global:
+  # Docker network for all decoy services
+  docker_network: "honeypot_net"
+  docker_network_subnet: "172.20.0.0/16"
+
+  # Shared response behavior
+  response_jitter_ms: 50  # random delay added to responses
+  realistic_errors: true   # return realistic error messages
+  session_tracking: true   # track attacker sessions across services
+
+  # Interaction depth
+  # Controls how deep the emulation goes before returning errors
+  max_interaction_depth: 10
+  escalation_delay_ms: 500  # delay between escalating responses
+
+  # Canary token configuration
+  canary_tokens:
+    enabled: true
+    callback_url: "https://canary.internal/callback"
+    token_types:
+      - "aws_key"
+      - "github_token"
+      - "slack_webhook"
+      - "database_url"
+      - "ssh_key"

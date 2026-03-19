@@ -1,0 +1,70 @@
+# RubyGuardian Honeypot - Fake Database Configuration
+#
+# HONEYPOT WARNING: All credentials in this file are fabricated canary values.
+# Any use of these credentials triggers a security alert. This file is
+# intentionally "leaked" to attract and detect attacker activity.
+
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 10) %>
+  timeout: 5000
+  reconnect: true
+  prepared_statements: true
+  advisory_locks: true
+
+development:
+  <<: *default
+  host: localhost
+  port: 5432
+  database: internal_admin_dev
+  username: webapp_dev
+  password: dev_password_123
+  min_messages: warning
+
+test:
+  <<: *default
+  host: localhost
+  port: 5432
+  database: internal_admin_test
+  username: webapp_test
+  password: test_password_456
+
+staging:
+  <<: *default
+  host: staging-db.internal.example.com
+  port: 5432
+  database: internal_admin_staging
+  username: deploy_staging
+  password: St4g1ng_D3pl0y_P4ss!
+  pool: 15
+  sslmode: require
+
+production:
+  <<: *default
+  host: db.internal
+  port: 5432
+  database: webapp_prod
+  username: deploy
+  password: D3pl0y$ecret
+  pool: 25
+  sslmode: require
+  statement_timeout: 30000
+  lock_timeout: 10000
+  idle_in_transaction_session_timeout: 60000
+  connect_timeout: 5
+  variables:
+    statement_timeout: 30s
+    lock_timeout: 10s
+
+# Read replica for reporting queries
+production_replica:
+  <<: *default
+  host: db-replica.internal
+  port: 5432
+  database: webapp_prod
+  username: readonly_user
+  password: R34d0nly_P4ss_789!
+  pool: 10
+  sslmode: require
+  replica: true

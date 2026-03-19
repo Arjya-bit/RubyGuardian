@@ -1,0 +1,221 @@
+# RubyGuardian Phase 4 - Memory Forensics Configuration
+# ==============================================================
+
+general:
+  # Toolkit version
+  version: "4.0.0"
+  # Working directory for temporary files during analysis
+  work_dir: "/tmp/rubyguardian_forensics"
+  # Maximum memory to use for analysis (bytes)
+  max_analysis_memory: 4294967296  # 4 GB
+  # Enable verbose logging
+  verbose: false
+  # Log file location
+  log_file: "logs/forensics.log"
+  log_level: "info"  # debug, info, warn, error
+
+acquisition:
+  # Memory dump acquisition settings
+  methods:
+    - proc_mem        # /proc/<pid>/mem (Linux)
+    - gcore           # GDB gcore command
+    - ptrace          # ptrace-based acquisition
+    - winapi          # Windows API (MiniDumpWriteDump)
+  # Default method per platform
+  default_method:
+    linux: proc_mem
+    darwin: gcore
+    windows: winapi
+  # Compress dumps after acquisition
+  compress_dumps: true
+  compression_algorithm: "zstd"  # zstd, gzip, lz4
+  # Calculate checksums for chain of custody
+  hash_algorithms:
+    - sha256
+    - md5
+  # Maximum dump size before warning (bytes)
+  max_dump_size: 10737418240  # 10 GB
+  # Timeout for acquisition (seconds)
+  timeout: 300
+  # Pause process during acquisition for consistency
+  pause_process: true
+
+ruby_vm:
+  # Ruby VM structure offsets and sizes
+  # These vary by Ruby version - select appropriate profile
+  profiles_dir: "config/volatility_profiles"
+  default_profile: "ruby_3_2_linux"
+  # Known Ruby VM magic values for identification
+  magic_values:
+    rvalue_flag_mask: 0x1f
+    heap_page_header_size: 80
+    rbasic_flags_offset: 0
+    rbasic_klass_offset: 8
+  # Ruby type IDs (T_xxx constants)
+  type_ids:
+    T_NONE: 0x00
+    T_OBJECT: 0x01
+    T_CLASS: 0x02
+    T_MODULE: 0x03
+    T_FLOAT: 0x04
+    T_STRING: 0x05
+    T_REGEXP: 0x06
+    T_ARRAY: 0x07
+    T_HASH: 0x08
+    T_STRUCT: 0x09
+    T_BIGNUM: 0x0a
+    T_FILE: 0x0b
+    T_DATA: 0x0c
+    T_MATCH: 0x0d
+    T_COMPLEX: 0x0e
+    T_RATIONAL: 0x0f
+    T_NIL: 0x11
+    T_TRUE: 0x12
+    T_FALSE: 0x13
+    T_SYMBOL: 0x14
+    T_FIXNUM: 0x15
+    T_UNDEF: 0x16
+    T_IMEMO: 0x1a
+    T_NODE: 0x1b
+    T_ICLASS: 0x1c
+    T_ZOMBIE: 0x1d
+    T_MOVED: 0x1e
+
+analysis:
+  # Heap analysis settings
+  heap:
+    # Minimum number of suspicious allocations to flag
+    anomaly_threshold: 50
+    # Detect unusually large objects
+    large_object_threshold: 1048576  # 1 MB
+    # Detect heap spray patterns
+    spray_detection:
+      enabled: true
+      min_identical_objects: 100
+      min_nop_sled_length: 64
+    # Fragmentation analysis
+    fragmentation_warning_threshold: 0.7
+
+  # String extraction settings
+  strings:
+    min_length: 4
+    max_length: 65536
+    encodings:
+      - utf-8
+      - ascii
+      - utf-16le
+      - utf-16be
+    # Categories for automatic classification
+    categories:
+      urls: true
+      ip_addresses: true
+      file_paths: true
+      email_addresses: true
+      base64_blobs: true
+      shell_commands: true
+      api_keys: true
+      crypto_addresses: true
+
+  # IOC scanning settings
+  ioc_scanning:
+    yara_rules_dir: "config/ioc_patterns"
+    # Maximum scan time per rule (seconds)
+    rule_timeout: 30
+    # Enable heuristic detection
+    heuristic_detection: true
+    # Confidence threshold (0.0 - 1.0)
+    min_confidence: 0.6
+    # Known-good hash allowlist
+    allowlist_file: "config/allowlist.yml"
+
+  # Network artifact extraction
+  network:
+    # Extract socket structures
+    extract_sockets: true
+    # Extract DNS cache entries
+    extract_dns_cache: true
+    # Extract HTTP artifacts
+    extract_http: true
+    # Extract SSL/TLS session data
+    extract_tls: true
+    # GeoIP database for IP enrichment
+    geoip_database: "/usr/share/GeoIP/GeoLite2-City.mmdb"
+
+reconstruction:
+  # ObjectSpace reconstruction settings
+  objectspace:
+    # Maximum depth for object graph traversal
+    max_depth: 20
+    # Include frozen strings in reconstruction
+    include_frozen_strings: true
+    # Reconstruct method tables
+    reconstruct_methods: true
+
+  # Code reconstruction settings
+  code:
+    # Attempt to decompile instruction sequences
+    decompile_iseq: true
+    # Maximum iseq size to attempt decompilation
+    max_iseq_size: 1048576
+    # Output reconstructed code to files
+    output_reconstructed: true
+    output_dir: "reconstructed_code"
+
+  # Deobfuscation settings
+  deobfuscation:
+    # Maximum deobfuscation iterations
+    max_iterations: 100
+    # Known obfuscation techniques to detect
+    techniques:
+      - base64_encoding
+      - eval_string_construction
+      - marshal_load
+      - character_code_assembly
+      - xor_encoding
+      - zlib_compression
+      - string_unpack
+      - define_method_injection
+      - method_missing_abuse
+      - binding_eval
+
+reporting:
+  # Report generation settings
+  output_dir: "reports"
+  formats:
+    - html
+    - json
+    - pdf
+  # Include raw evidence in reports
+  include_evidence: true
+  # Maximum evidence items per category
+  max_evidence_items: 1000
+  # Template directory
+  template_dir: "templates"
+  # Classification level
+  classification: "CONFIDENTIAL"
+  # Analyst information
+  analyst:
+    name: ""
+    organization: "RubyGuardian Security Research"
+    contact: ""
+
+timeline:
+  # Timeline construction settings
+  # Time zone for timestamps
+  timezone: "UTC"
+  # Granularity for timeline entries
+  granularity: "second"  # second, minute, hour
+  # Include system events
+  include_system_events: true
+  # Output format
+  format: "json"  # json, csv, bodyfile
+
+volatility:
+  # Volatility framework integration
+  volatility_path: "/usr/bin/vol3"
+  # Plugin directory
+  plugin_dir: "volatility_plugins"
+  # Symbol table cache
+  symbol_cache: "/tmp/volatility_symbols"
+  # Parallel processing
+  workers: 4

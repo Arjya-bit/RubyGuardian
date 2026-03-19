@@ -1,0 +1,464 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "RubyGuardian System Health - Infrastructure and agent monitoring",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["ruby-guardian"],
+      "targetBlank": true,
+      "title": "RubyGuardian Dashboards",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "System Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["distinctCount"], "fields": "/^agent\\.id$/", "values": false },
+        "textMode": "auto"
+      },
+      "title": "Active Agents",
+      "type": "stat",
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [{ "field": "agent.id", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" }, "type": "terms" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "title": "Events (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "1h", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 75 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["mean"], "fields": "/^process\\.cpu_percent$/", "values": false },
+        "textMode": "auto"
+      },
+      "title": "Avg CPU Usage (Monitored Processes)",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "5m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "process.cpu_percent", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 536870912 },
+              { "color": "red", "value": 1073741824 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["mean"], "fields": "/^process\\.memory_usage$/", "values": false }
+      },
+      "title": "Avg Memory Usage",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "5m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "process.memory_usage", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Event Ingestion Rate",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Events / min",
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "scheme",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Event Ingestion Rate Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "All Events",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "1m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "Critical Events",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "1m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "severity: critical",
+          "refId": "B",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "High Events",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "1m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "severity: high",
+          "refId": "C",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#EAB839", "value": 30 },
+              { "color": "orange", "value": 60 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "none"
+        }
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 6 },
+      "id": 6,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Current Threat Level",
+      "type": "gauge",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "field": "threat_score", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 102,
+      "title": "Agent Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "stacking": { "mode": "none" }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 17 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Memory Usage by Agent",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{term agent.hostname}}",
+          "bucketAggs": [
+            { "field": "agent.hostname", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "5m", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "field": "process.memory_usage", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "mode": "none" }
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 17 },
+      "id": 8,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "CPU Usage by Agent",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{term agent.hostname}}",
+          "bucketAggs": [
+            { "field": "agent.hostname", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "5m", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "field": "process.cpu_percent", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103,
+      "title": "Network Activity",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+      "id": 9,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Network Bytes Sent/Received",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "Bytes Sent",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "10m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "network.bytes_sent", "id": "1", "type": "sum" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "Bytes Received",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "10m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "network.bytes_received", "id": "1", "type": "sum" }],
+          "query": "",
+          "refId": "B",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+      "id": 10,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "DNS Queries Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "DNS Queries",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "5m", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "network.dns_query: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ruby-guardian", "system-health"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+        "definition": "{\"find\": \"terms\", \"field\": \"agent.hostname\"}",
+        "includeAll": true,
+        "multi": true,
+        "name": "agent",
+        "query": "{\"find\": \"terms\", \"field\": \"agent.hostname\"}",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+  },
+  "timezone": "utc",
+  "title": "RubyGuardian - System Health",
+  "uid": "rg-system-health",
+  "version": 1
+}

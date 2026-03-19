@@ -1,0 +1,156 @@
+# =============================================================================
+# RubyGuardian - Docker Volume Configuration
+# =============================================================================
+# Persistent storage definitions for stateful components.
+# Used by docker-compose.yml and can be created standalone via:
+#   docker volume create --name <volume> --opt type=none \
+#     --opt o=bind --opt device=<host_path>
+# =============================================================================
+
+version: "3.9"
+
+volumes:
+  # ---------------------------------------------------------------------------
+  # Elasticsearch data - primary storage for all security events
+  # ---------------------------------------------------------------------------
+  rg-elasticsearch-data:
+    name: rg-elasticsearch-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/elasticsearch
+    labels:
+      project: rubyguardian
+      component: elk-stack
+      backup.schedule: daily
+      backup.retention: "30d"
+
+  # ---------------------------------------------------------------------------
+  # Kibana saved objects - dashboards, visualizations, index patterns
+  # ---------------------------------------------------------------------------
+  rg-kibana-data:
+    name: rg-kibana-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/kibana
+    labels:
+      project: rubyguardian
+      component: elk-stack
+
+  # ---------------------------------------------------------------------------
+  # ML models - trained classifier weights and metadata
+  # ---------------------------------------------------------------------------
+  rg-ml-models:
+    name: rg-ml-models
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/ml-models
+    labels:
+      project: rubyguardian
+      component: ml-classifier
+      backup.schedule: "on-train"
+
+  # ---------------------------------------------------------------------------
+  # Training data - feature vectors, labeled datasets
+  # ---------------------------------------------------------------------------
+  rg-training-data:
+    name: rg-training-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/training-data
+    labels:
+      project: rubyguardian
+      component: ml-classifier
+
+  # ---------------------------------------------------------------------------
+  # Memory dumps - captured process memory for forensic analysis
+  # ---------------------------------------------------------------------------
+  rg-memory-dumps:
+    name: rg-memory-dumps
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/memory-dumps
+    labels:
+      project: rubyguardian
+      component: forensics
+      security.classification: sensitive
+      backup.schedule: "on-capture"
+
+  # ---------------------------------------------------------------------------
+  # Forensic reports - generated analysis reports
+  # ---------------------------------------------------------------------------
+  rg-forensic-reports:
+    name: rg-forensic-reports
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/forensic-reports
+    labels:
+      project: rubyguardian
+      component: forensics
+
+  # ---------------------------------------------------------------------------
+  # Honeypot telemetry - raw interaction logs before ELK ingestion
+  # ---------------------------------------------------------------------------
+  rg-honeypot-telemetry:
+    name: rg-honeypot-telemetry
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/honeypot-telemetry
+    labels:
+      project: rubyguardian
+      component: honeypot
+      security.classification: sensitive
+
+  # ---------------------------------------------------------------------------
+  # Honeypot gems - deceptive gem packages served to attackers
+  # ---------------------------------------------------------------------------
+  rg-honeypot-gems:
+    name: rg-honeypot-gems
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/honeypot-gems
+    labels:
+      project: rubyguardian
+      component: honeypot
+
+  # ---------------------------------------------------------------------------
+  # Logstash pipeline config - custom pipelines for event processing
+  # ---------------------------------------------------------------------------
+  rg-logstash-pipeline:
+    name: rg-logstash-pipeline
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RG_DATA_ROOT:-/var/lib/rubyguardian}/logstash-pipeline
+    labels:
+      project: rubyguardian
+      component: elk-stack
+
+  # ---------------------------------------------------------------------------
+  # Shared temp - ephemeral data exchange between containers
+  # ---------------------------------------------------------------------------
+  rg-shared-tmp:
+    name: rg-shared-tmp
+    driver: local
+    driver_opts:
+      type: tmpfs
+      o: "size=512m,uid=1000,gid=1000"
+    labels:
+      project: rubyguardian
+      ephemeral: "true"

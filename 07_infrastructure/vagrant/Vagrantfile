@@ -1,0 +1,170 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+# =============================================================================
+# RubyGuardian - Vagrant Multi-VM Lab Environment
+# =============================================================================
+# Creates an isolated four-node lab for security research:
+#   1. attacker  - Red-team simulation host
+#   2. target    - Victim host running vulnerable Ruby services
+#   3. monitor   - ELK stack + RubyGuardian dashboard
+#   4. honeypot  - Deceptive gem repository
+#
+# Usage:
+#   vagrant up                  # Start all VMs
+#   vagrant up attacker target  # Start specific VMs
+#   vagrant ssh monitor         # SSH into monitor
+#   vagrant destroy -f          # Tear down everything
+# =============================================================================
+
+require 'yaml'
+
+# Load per-VM configuration from YAML files
+CONFIGS_DIR  = File.join(File.dirname(__FILE__), 'configs')
+SCRIPTS_DIR  = File.join(File.dirname(__FILE__), 'scripts')
+
+ATTACKER_CFG = YAML.load_file(File.join(CONFIGS_DIR, 'attacker_config.yml'))
+TARGET_CFG   = YAML.load_file(File.join(CONFIGS_DIR, 'target_config.yml'))
+MONITOR_CFG  = YAML.load_file(File.join(CONFIGS_DIR, 'monitor_config.yml'))
+
+# Shared project root mounted into every VM
+PROJECT_ROOT = File.expand_path('../../..', __FILE__)
+
+Vagrant.configure("2") do |config|
+  # Common settings
+  config.vm.box_check_update = true
+  config.ssh.forward_agent   = true
+
+  # ---------------------------------------------------------------------------
+  # 1. Attacker VM
+  # ---------------------------------------------------------------------------
+  config.vm.define "attacker", primary: false do |attacker|
+    attacker.vm.box      = "ubuntu/jammy64"
+    attacker.vm.hostname = "rg-attacker"
+
+    # Private network - attack segment
+    attacker.vm.network "private_network",
+      ip: ATTACKER_CFG['network']['ip'],
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-attack-net"
+
+    # Private network - honeypot segment (attacker can reach honeypot)
+    attacker.vm.network "private_network",
+      ip: "172.29.0.10",
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-honeypot-net"
+
+    attacker.vm.synced_folder PROJECT_ROOT, "/opt/rubyguardian", type: "virtualbox"
+
+    attacker.vm.provider "virtualbox" do |vb|
+      vb.name   = "RubyGuardian-Attacker"
+      vb.memory = ATTACKER_CFG['resources']['memory']
+      vb.cpus   = ATTACKER_CFG['resources']['cpus']
+      vb.gui    = false
+      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    end
+
+    attacker.vm.provision "shell",
+      path: File.join(SCRIPTS_DIR, 'provision_attacker.sh'),
+      privileged: true
+  end
+
+  # ---------------------------------------------------------------------------
+  # 2. Target VM
+  # ---------------------------------------------------------------------------
+  config.vm.define "target", primary: false do |target|
+    target.vm.box      = "ubuntu/jammy64"
+    target.vm.hostname = "rg-target"
+
+    # Private network - attack segment (target is reachable by attacker)
+    target.vm.network "private_network",
+      ip: TARGET_CFG['network']['ip'],
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-attack-net"
+
+    # Private network - internal segment (target sends telemetry to monitor)
+    target.vm.network "private_network",
+      ip: "172.28.0.20",
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-internal-net"
+
+    target.vm.synced_folder PROJECT_ROOT, "/opt/rubyguardian", type: "virtualbox"
+
+    target.vm.provider "virtualbox" do |vb|
+      vb.name   = "RubyGuardian-Target"
+      vb.memory = TARGET_CFG['resources']['memory']
+      vb.cpus   = TARGET_CFG['resources']['cpus']
+      vb.gui    = false
+    end
+
+    target.vm.provision "shell",
+      path: File.join(SCRIPTS_DIR, 'provision_target.sh'),
+      privileged: true
+  end
+
+  # ---------------------------------------------------------------------------
+  # 3. Monitor VM
+  # ---------------------------------------------------------------------------
+  config.vm.define "monitor", primary: true do |monitor|
+    monitor.vm.box      = "ubuntu/jammy64"
+    monitor.vm.hostname = "rg-monitor"
+
+    # Private network - internal segment
+    monitor.vm.network "private_network",
+      ip: MONITOR_CFG['network']['ip'],
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-internal-net"
+
+    # Port forwards for browser access
+    monitor.vm.network "forwarded_port", guest: 5601, host: 5601   # Kibana
+    monitor.vm.network "forwarded_port", guest: 9200, host: 9200   # Elasticsearch
+    monitor.vm.network "forwarded_port", guest: 3000, host: 3000   # Dashboard
+    monitor.vm.network "forwarded_port", guest: 9090, host: 9090   # Prometheus
+
+    monitor.vm.synced_folder PROJECT_ROOT, "/opt/rubyguardian", type: "virtualbox"
+
+    monitor.vm.provider "virtualbox" do |vb|
+      vb.name   = "RubyGuardian-Monitor"
+      vb.memory = MONITOR_CFG['resources']['memory']
+      vb.cpus   = MONITOR_CFG['resources']['cpus']
+      vb.gui    = false
+      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    end
+
+    monitor.vm.provision "shell",
+      path: File.join(SCRIPTS_DIR, 'provision_monitor.sh'),
+      privileged: true
+  end
+
+  # ---------------------------------------------------------------------------
+  # 4. Honeypot VM
+  # ---------------------------------------------------------------------------
+  config.vm.define "honeypot", primary: false do |honeypot|
+    honeypot.vm.box      = "ubuntu/jammy64"
+    honeypot.vm.hostname = "rg-honeypot"
+
+    # Private network - honeypot segment (reachable by attacker)
+    honeypot.vm.network "private_network",
+      ip: "172.29.0.20",
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-honeypot-net"
+
+    # Private network - internal segment (sends telemetry to monitor)
+    honeypot.vm.network "private_network",
+      ip: "172.28.0.30",
+      netmask: "255.255.0.0",
+      virtualbox__intnet: "rg-internal-net"
+
+    honeypot.vm.synced_folder PROJECT_ROOT, "/opt/rubyguardian", type: "virtualbox"
+
+    honeypot.vm.provider "virtualbox" do |vb|
+      vb.name   = "RubyGuardian-Honeypot"
+      vb.memory = 2048
+      vb.cpus   = 2
+      vb.gui    = false
+    end
+
+    honeypot.vm.provision "shell",
+      path: File.join(SCRIPTS_DIR, 'provision_honeypot.sh'),
+      privileged: true
+  end
+end

@@ -1,0 +1,145 @@
+# RubyGuardian - eBPF Probe Configuration
+# ========================================
+# Defines the eBPF probes attached for real-time kernel-level monitoring
+# of Ruby process behavior.
+
+probes:
+  # Syscall tracing probe
+  syscall_probe:
+    enabled: true
+    source: probes/syscall_probe.bpf.c
+    attach_points:
+      - type: tracepoint
+        name: syscalls/sys_enter_execve
+        handler: trace_execve
+      - type: tracepoint
+        name: syscalls/sys_enter_fork
+        handler: trace_fork
+      - type: tracepoint
+        name: syscalls/sys_enter_clone
+        handler: trace_clone
+      - type: tracepoint
+        name: syscalls/sys_enter_mmap
+        handler: trace_mmap
+      - type: tracepoint
+        name: syscalls/sys_enter_mprotect
+        handler: trace_mprotect
+      - type: tracepoint
+        name: syscalls/sys_enter_ptrace
+        handler: trace_ptrace
+      - type: tracepoint
+        name: syscalls/sys_enter_memfd_create
+        handler: trace_memfd_create
+      - type: tracepoint
+        name: syscalls/sys_enter_process_vm_writev
+        handler: trace_process_vm_writev
+      - type: tracepoint
+        name: syscalls/sys_enter_process_vm_readv
+        handler: trace_process_vm_readv
+    ring_buffer:
+      size_pages: 64
+      poll_timeout_ms: 100
+    filters:
+      # Only trace processes matching these comm names
+      target_comms:
+        - ruby
+        - bundle
+        - rails
+        - puma
+        - sidekiq
+        - unicorn
+        - rake
+      # Or trace processes with these parent comms
+      parent_comms:
+        - ruby
+        - bundle
+
+  # Memory allocation probe
+  memory_alloc_probe:
+    enabled: true
+    source: probes/memory_alloc_probe.bpf.c
+    attach_points:
+      - type: kprobe
+        name: do_mmap
+        handler: kprobe_do_mmap
+      - type: kretprobe
+        name: do_mmap
+        handler: kretprobe_do_mmap
+      - type: kprobe
+        name: do_mprotect_pkey
+        handler: kprobe_mprotect
+      - type: tracepoint
+        name: syscalls/sys_enter_brk
+        handler: trace_brk
+      - type: tracepoint
+        name: syscalls/sys_enter_munmap
+        handler: trace_munmap
+    ring_buffer:
+      size_pages: 32
+      poll_timeout_ms: 200
+    detection:
+      # Alert on RWX mappings
+      detect_rwx: true
+      # Alert on anon exec mappings (no file backing)
+      detect_anon_exec: true
+      # Alert on mprotect adding exec to writable pages
+      detect_w_to_wx: true
+      # Track total mapped memory per process
+      track_total_mapped: true
+      max_mapped_mb: 2048
+
+  # Network probe
+  network_probe:
+    enabled: true
+    source: probes/network_probe.bpf.c
+    attach_points:
+      - type: kprobe
+        name: tcp_connect
+        handler: kprobe_tcp_connect
+      - type: kprobe
+        name: tcp_sendmsg
+        handler: kprobe_tcp_sendmsg
+      - type: kprobe
+        name: tcp_recvmsg
+        handler: kprobe_tcp_recvmsg
+      - type: kprobe
+        name: udp_sendmsg
+        handler: kprobe_udp_sendmsg
+      - type: tracepoint
+        name: syscalls/sys_enter_connect
+        handler: trace_connect
+      - type: tracepoint
+        name: syscalls/sys_enter_bind
+        handler: trace_bind
+      - type: tracepoint
+        name: syscalls/sys_enter_sendto
+        handler: trace_sendto
+    ring_buffer:
+      size_pages: 64
+      poll_timeout_ms: 100
+    detection:
+      # Track per-connection byte counts
+      track_bytes: true
+      # Alert on connections to known-bad ports
+      suspicious_ports:
+        - 4444
+        - 5555
+        - 6666
+        - 8443
+        - 1337
+        - 31337
+      # Alert on bind to 0.0.0.0
+      detect_wildcard_bind: true
+      # Track DNS queries (port 53)
+      track_dns: true
+
+global:
+  # Maximum number of tracked PIDs
+  max_tracked_pids: 1024
+  # Per-CPU buffer size
+  per_cpu_buffer_pages: 16
+  # Enable debug output in /sys/kernel/debug/tracing/trace_pipe
+  debug: false
+  # Auto-detach probes if overhead exceeds threshold
+  max_overhead_percent: 2.0
+  overhead_check_interval_seconds: 30

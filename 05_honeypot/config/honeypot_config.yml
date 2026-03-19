@@ -1,0 +1,226 @@
+# RubyGuardian Phase 5 - Honeypot Configuration
+# Main configuration for the honeypot and threat intelligence system
+
+honeypot:
+  # Unique identifier for this honeypot instance
+  instance_id: "rg-honeypot-001"
+  environment: "production"
+  log_level: "info"
+
+  # Network binding configuration
+  network:
+    listen_address: "0.0.0.0"
+    external_ip: "auto"  # auto-detect or specify
+    dns_name: "honeypot.internal.example.com"
+
+  # Data storage paths
+  storage:
+    base_path: "/var/lib/rubyguardian/honeypot"
+    captures_path: "/var/lib/rubyguardian/honeypot/captures"
+    samples_path: "/var/lib/rubyguardian/honeypot/samples"
+    logs_path: "/var/log/rubyguardian/honeypot"
+    database_path: "/var/lib/rubyguardian/honeypot/honeypot.db"
+    redis_url: "redis://localhost:6379/5"
+
+  # Capture engine settings
+  capture:
+    # Packet capture
+    packet_logger:
+      enabled: true
+      interface: "eth0"
+      snap_length: 65535
+      promiscuous: true
+      buffer_size: 10485760  # 10MB ring buffer
+      pcap_rotation_size: 104857600  # 100MB per file
+      pcap_retention_days: 30
+      bpf_filter: ""  # empty = capture all
+
+    # HTTP request logging
+    request_logger:
+      enabled: true
+      log_headers: true
+      log_body: true
+      max_body_size: 5242880  # 5MB
+      log_format: "json"
+      sensitive_header_mask:
+        - "Authorization"
+        - "Cookie"
+        - "X-Api-Key"
+
+    # Code execution traps
+    eval_trap:
+      enabled: true
+      intercept_methods:
+        - "eval"
+        - "instance_eval"
+        - "class_eval"
+        - "module_eval"
+        - "send"
+        - "public_send"
+        - "method_missing"
+        - "const_missing"
+      max_payload_size: 1048576  # 1MB
+      alert_threshold: 1  # alert on first eval attempt
+
+    exec_trap:
+      enabled: true
+      intercept_methods:
+        - "system"
+        - "exec"
+        - "spawn"
+        - "IO.popen"
+        - "Open3.capture3"
+        - "Kernel.`"
+      blocked_commands:
+        - "rm -rf"
+        - "mkfs"
+        - "dd if="
+        - ":(){:|:&};:"
+      log_all_commands: true
+
+    file_trap:
+      enabled: true
+      monitored_paths:
+        - "/etc/passwd"
+        - "/etc/shadow"
+        - "/root/.ssh"
+        - "/home/*/.ssh"
+        - "/proc/self/environ"
+        - "/var/run/secrets"
+        - "config/database.yml"
+        - "config/secrets.yml"
+        - "config/master.key"
+        - ".env"
+        - "credentials.yml.enc"
+      canary_files:
+        - path: "/root/.ssh/id_rsa"
+          content: "canary_ssh_key"
+        - path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+          content: "canary_k8s_token"
+        - path: "config/master.key"
+          content: "canary_master_key"
+      alert_on_read: true
+      alert_on_write: true
+
+    credential_trap:
+      enabled: true
+      fake_credentials:
+        - username: "admin"
+          password: "Rubyr00t!2024"
+          service: "rails_admin"
+        - username: "deploy"
+          password: "D3pl0y$ecret"
+          service: "capistrano"
+        - username: "root"
+          password: "toor"
+          service: "ssh"
+        - username: "postgres"
+          password: "p0stgre$Pwd"
+          service: "database"
+        - api_key: "rg_live_sk_51ABC123fake456DEF789"
+          service: "stripe"
+        - token: "ghp_fake1234567890abcdefghijklmnopqrstuv"
+          service: "github"
+      track_reuse: true  # track if captured creds are reused elsewhere
+
+    sample_collector:
+      enabled: true
+      max_sample_size: 52428800  # 50MB
+      hash_algorithms:
+        - "sha256"
+        - "md5"
+        - "ssdeep"
+      dedup_enabled: true
+      auto_submit_to_sandbox: true
+      quarantine_path: "/var/lib/rubyguardian/honeypot/quarantine"
+
+  # Sandbox configuration
+  sandbox:
+    enabled: true
+    docker_socket: "/var/run/docker.sock"
+    base_image: "rubyguardian/sandbox:latest"
+    network: "honeypot_sandbox_net"
+
+    resource_limits:
+      cpu_shares: 256
+      memory_limit: "256m"
+      memory_swap: "256m"
+      pids_limit: 100
+      disk_quota: "512m"
+      network_disabled: false  # allow but monitor
+      read_only_rootfs: true
+
+    execution:
+      max_runtime_seconds: 120
+      auto_kill: true
+      snapshot_interval_seconds: 5
+
+    behavior_recording:
+      syscall_tracing: true
+      network_capture: true
+      filesystem_monitoring: true
+      process_monitoring: true
+
+  # Analysis configuration
+  analysis:
+    auto_analyze: true
+    pattern_matching:
+      enabled: true
+      rules_path: "/var/lib/rubyguardian/honeypot/rules"
+      custom_rules_path: "/var/lib/rubyguardian/honeypot/custom_rules"
+      update_interval_hours: 6
+
+    ip_enrichment:
+      enabled: true
+      geoip_database: "/var/lib/rubyguardian/GeoLite2-City.mmdb"
+      asn_database: "/var/lib/rubyguardian/GeoLite2-ASN.mmdb"
+      cache_ttl_hours: 24
+      max_concurrent_lookups: 10
+
+    reporting:
+      daily_report:
+        enabled: true
+        send_time: "06:00"
+        timezone: "UTC"
+        recipients:
+          - "security@example.com"
+        format: "html"
+      alert_thresholds:
+        new_attack_patterns: 1
+        credential_harvesting: 1
+        code_execution_attempts: 1
+        sample_collected: 5
+        unique_source_ips: 50
+
+  # Alerting and notification
+  alerting:
+    enabled: true
+    channels:
+      slack:
+        enabled: false
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#security-alerts"
+        severity_filter: "high"
+      email:
+        enabled: false
+        smtp_host: "smtp.example.com"
+        smtp_port: 587
+        from: "honeypot@example.com"
+        to:
+          - "security@example.com"
+      syslog:
+        enabled: true
+        host: "localhost"
+        port: 514
+        protocol: "udp"
+        facility: "local0"
+
+  # Operational safety
+  safety:
+    # Prevent honeypot from being used as attack platform
+    outbound_rate_limit: 100  # max outbound packets/sec
+    max_connections: 1000
+    connection_rate_limit: 50  # new connections/sec
+    auto_shutdown_on_compromise: false
+    health_check_interval_seconds: 60
+    watchdog_enabled: true

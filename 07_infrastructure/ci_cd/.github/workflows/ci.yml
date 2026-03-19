@@ -1,0 +1,318 @@
+# =============================================================================
+# RubyGuardian - Main CI Workflow
+# =============================================================================
+# Triggered on every push and pull request.  Runs linting, unit tests,
+# integration tests, and Docker image builds in parallel where possible.
+# =============================================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUBY_VERSION: "3.2"
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "18"
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/rubyguardian
+
+permissions:
+  contents: read
+  packages: write
+  checks: write
+  pull-requests: write
+
+jobs:
+  # ─── Lint ─────────────────────────────────────────────────────────────
+  lint-ruby:
+    name: "Lint: Ruby (RuboCop)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop --format github --parallel
+
+  lint-python:
+    name: "Lint: Python (Ruff + mypy)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy
+
+      - name: Run Ruff
+        run: ruff check --output-format=github .
+
+      - name: Run mypy
+        run: mypy 03_ml_classifier/ --ignore-missing-imports
+
+  lint-frontend:
+    name: "Lint: Frontend (ESLint)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: 06_dashboard/web_ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: 06_dashboard/web_ui
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: 06_dashboard/web_ui
+        run: npx eslint . --format compact
+
+  lint-kubernetes:
+    name: "Lint: Kubernetes manifests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install kubeval
+        run: |
+          wget -qO- https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
+          sudo mv kubeval /usr/local/bin/
+
+      - name: Validate manifests
+        run: |
+          find 07_infrastructure/kubernetes -name '*.yml' -not -name 'example-*' \
+            | xargs kubeval --strict --kubernetes-version 1.28.0
+
+  # ─── Test ─────────────────────────────────────────────────────────────
+  test-ruby:
+    name: "Test: Ruby (RSpec)"
+    runs-on: ubuntu-latest
+    needs: lint-ruby
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: "-Xms256m -Xmx256m"
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd="curl -sf http://localhost:9200/_cluster/health"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+
+      - name: Run unit tests
+        run: |
+          bundle exec rake spec:unit
+        env:
+          ELASTICSEARCH_URL: http://localhost:9200
+          RUBY_GUARDIAN_ENV: test
+
+      - name: Run integration tests
+        run: |
+          bundle exec rake spec:integration
+        env:
+          ELASTICSEARCH_URL: http://localhost:9200
+          RUBY_GUARDIAN_ENV: test
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruby-coverage
+          path: coverage/
+          retention-days: 14
+
+  test-python:
+    name: "Test: Python (pytest)"
+    runs-on: ubuntu-latest
+    needs: lint-python
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run tests
+        run: |
+          pytest 03_ml_classifier/tests/ \
+            09_testing/ \
+            --cov=03_ml_classifier \
+            --cov-report=xml:coverage-python.xml \
+            --junitxml=test-results-python.xml \
+            -v
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: coverage-python.xml
+          retention-days: 14
+
+  test-frontend:
+    name: "Test: Frontend (Vitest)"
+    runs-on: ubuntu-latest
+    needs: lint-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: 06_dashboard/web_ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: 06_dashboard/web_ui
+        run: npm ci
+
+      - name: Run tests
+        working-directory: 06_dashboard/web_ui
+        run: npx vitest run --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: 06_dashboard/web_ui/coverage/
+          retention-days: 14
+
+  # ─── Build ────────────────────────────────────────────────────────────
+  build-images:
+    name: "Build: Docker images"
+    runs-on: ubuntu-latest
+    needs: [test-ruby, test-python, test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        component:
+          - name: detection-agent
+            dockerfile: 07_infrastructure/docker/base/Dockerfile.ruby
+            target: detection-agent
+          - name: ml-classifier
+            dockerfile: 07_infrastructure/docker/base/Dockerfile.python
+            target: classifier-api
+          - name: honeypot-rails
+            dockerfile: 05_honeypot/decoy_apps/fake_rails_app/Dockerfile
+            target: ""
+          - name: web-ui
+            dockerfile: 06_dashboard/web_ui/Dockerfile
+            target: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.component.name }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.component.dockerfile }}
+          target: ${{ matrix.component.target || '' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Summary ──────────────────────────────────────────────────────────
+  ci-summary:
+    name: "CI Summary"
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint-ruby, lint-python, lint-frontend, lint-kubernetes, test-ruby, test-python, test-frontend]
+    steps:
+      - name: Check results
+        run: |
+          echo "## CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby Lint | ${{ needs.lint-ruby.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Lint | ${{ needs.lint-python.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Lint | ${{ needs.lint-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| K8s Lint | ${{ needs.lint-kubernetes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby Tests | ${{ needs.test-ruby.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Tests | ${{ needs.test-python.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Tests | ${{ needs.test-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure')
+        run: exit 1

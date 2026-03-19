@@ -1,0 +1,18 @@
+# Testing environment settings (sandboxed)
+environment: testing
+
+logging:
+  level: warn
+  format: json
+  console: false
+
+safety:
+  require_confirmation: false
+  dry_run: true
+  sandbox_check: true
+
+network:
+  c2_host: "127.0.0.1"
+  c2_port: 4444
+  allowed_targets:
+    - "127.0.0.1"

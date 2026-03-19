@@ -1,0 +1,188 @@
+# RubyGuardian - Network Exfiltration Detection Signatures
+# ========================================================
+# Detects data exfiltration techniques via network channels including
+# DNS tunneling, HTTP covert channels, and beaconing patterns.
+
+signatures:
+  - id: NE-001
+    name: "DNS Tunneling via Resolv"
+    description: >
+      Detects use of Ruby's Resolv library to perform DNS queries
+      with unusually long or encoded subdomain labels, indicating
+      DNS tunneling for data exfiltration.
+    severity: critical
+    mitre_attack:
+      tactic: exfiltration
+      technique: T1048.003
+    indicators:
+      ruby_api:
+        classes_used:
+          - Resolv
+          - Resolv::DNS
+        methods_called:
+          - getaddress
+          - getresource
+      network:
+        dns:
+          query_length_gt: 50
+          label_entropy_gt: 3.5
+          frequency_per_minute_gt: 30
+          unusual_record_types:
+            - TXT
+            - CNAME
+            - MX
+    score: 92
+    tags: [exfiltration, dns_tunneling]
+
+  - id: NE-002
+    name: "HTTP Covert Channel"
+    description: >
+      Detects data exfiltration via HTTP requests with encoded data
+      in headers, cookies, URL parameters, or POST bodies to
+      non-standard endpoints.
+    severity: high
+    mitre_attack:
+      tactic: exfiltration
+      technique: T1048.002
+    indicators:
+      ruby_api:
+        classes_used:
+          - Net::HTTP
+          - Faraday
+          - HTTParty
+        methods_called:
+          - post
+          - put
+          - patch
+      network:
+        http:
+          large_header_size_gt: 4096
+          encoded_cookie_data: true
+          unusual_content_type: true
+          high_frequency: true
+    score: 80
+    tags: [exfiltration, http_covert_channel]
+
+  - id: NE-003
+    name: "C2 Beaconing Pattern"
+    description: >
+      Detects periodic outbound connections with regular intervals
+      (with jitter) indicating Command & Control beaconing.
+    severity: critical
+    mitre_attack:
+      tactic: command-and-control
+      technique: T1071.001
+    indicators:
+      network:
+        pattern: periodic
+        min_connections: 5
+        interval_regularity_gt: 0.85
+        jitter_tolerance: 0.15
+        destination:
+          not_in_safe_list: true
+          single_destination: true
+    score: 90
+    tags: [c2, beaconing]
+
+  - id: NE-004
+    name: "Large Data Transfer to External Host"
+    description: >
+      Detects transfer of large amounts of data to external hosts,
+      especially if the data appears to be encoded or compressed.
+    severity: high
+    mitre_attack:
+      tactic: exfiltration
+      technique: T1041
+    indicators:
+      network:
+        outbound:
+          total_bytes_gt: 1048576  # 1MB
+          window_seconds: 300
+          destination:
+            not_in_safe_list: true
+            not_private_ip: true
+      ruby_api:
+        methods_called_before:
+          - Base64.encode64
+          - Zlib::Deflate.deflate
+          - OpenSSL::Cipher
+    score: 78
+    tags: [exfiltration, large_transfer]
+
+  - id: NE-005
+    name: "ICMP Tunneling"
+    description: >
+      Detects use of raw sockets to send ICMP packets with embedded
+      data payloads for covert exfiltration.
+    severity: high
+    mitre_attack:
+      tactic: exfiltration
+      technique: T1048.003
+    indicators:
+      ruby_api:
+        classes_used:
+          - Socket
+        socket_type: SOCK_RAW
+        protocol: ICMP
+      network:
+        icmp:
+          payload_size_gt: 64
+          frequency_per_minute_gt: 10
+    score: 88
+    tags: [exfiltration, icmp_tunneling]
+
+  - id: NE-006
+    name: "Steganographic Exfiltration"
+    description: >
+      Detects reading of sensitive files followed by encoding operations
+      and network transfer of image/binary data, suggesting steganographic
+      exfiltration.
+    severity: high
+    mitre_attack:
+      tactic: exfiltration
+      technique: T1027
+    indicators:
+      chain:
+        window_seconds: 60
+        ordered: true
+        steps:
+          - file_read:
+              sensitive_paths: true
+          - encoding:
+              methods:
+                - pack
+                - encode
+                - Array.new
+          - network:
+              content_type_contains:
+                - image/
+                - application/octet-stream
+    score: 82
+    tags: [exfiltration, steganography]
+
+  - id: NE-007
+    name: "Environment Variable Exfiltration"
+    description: >
+      Detects reading of environment variables (which often contain
+      secrets) followed by network transmission.
+    severity: high
+    mitre_attack:
+      tactic: credential-access
+      technique: T1552.001
+    indicators:
+      ruby_api:
+        methods_called:
+          - ENV.to_h
+          - ENV.each
+          - ENV[]
+        sensitive_vars:
+          - AWS_SECRET
+          - DATABASE_URL
+          - API_KEY
+          - TOKEN
+          - PASSWORD
+          - SECRET
+      network:
+        outbound_after_ms: 5000
+    score: 86
+    tags: [exfiltration, credential_theft, env_vars]

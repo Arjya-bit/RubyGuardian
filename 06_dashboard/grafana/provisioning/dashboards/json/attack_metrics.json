@@ -1,0 +1,407 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "RubyGuardian Attack Metrics - Detailed attack analysis and trends",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["ruby-guardian"],
+      "title": "RubyGuardian Dashboards",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 200,
+      "title": "Attack Summary",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "Total Attacks (24h)",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "1h", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "severity: (critical OR high)",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "Process Hollowing Detections",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "attack.technique: process_hollowing",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "Supply Chain Alerts",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "attack.category: supply_chain",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false } },
+      "title": "LOLRuby Detections",
+      "type": "stat",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "attack.category: lolruby OR ruby.eval_detected: true",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 201,
+      "title": "Attack Trends",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          }
+        }
+      },
+      "gridPos": { "h": 12, "w": 16, "x": 0, "y": 7 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["sum", "mean"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Attacks by Category Over Time",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{term attack.category}}",
+          "bucketAggs": [
+            { "field": "attack.category", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "attack.category: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+        }
+      },
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 7 },
+      "id": 6,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "tooltip": { "mode": "single" }
+      },
+      "title": "Attack Category Distribution",
+      "type": "piechart",
+      "targets": [
+        {
+          "alias": "{{term attack.category}}",
+          "bucketAggs": [{ "field": "attack.category", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" }, "type": "terms" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "attack.category: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 202,
+      "title": "MITRE ATT&CK Coverage",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "hue",
+            "lineWidth": 1,
+            "stacking": { "mode": "none" }
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
+      "id": 7,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" }, "orientation": "horizontal" },
+      "title": "MITRE Tactics Observed",
+      "type": "barchart",
+      "targets": [
+        {
+          "alias": "{{term mitre.tactic}}",
+          "bucketAggs": [{ "field": "mitre.tactic", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" }, "type": "terms" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "mitre.tactic: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1, "stacking": { "mode": "none" } }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 20 },
+      "id": 8,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "orientation": "horizontal" },
+      "title": "Top MITRE Techniques",
+      "type": "barchart",
+      "targets": [
+        {
+          "alias": "{{term mitre.technique_name}}",
+          "bucketAggs": [{ "field": "mitre.technique_name", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" }, "type": "terms" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "mitre.technique_name: *",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 203,
+      "title": "Threat Score Analysis",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "scheme",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 31 },
+      "id": 9,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Threat Score Trend",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "Avg Threat Score",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "threat_score", "id": "1", "type": "avg" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "Max Threat Score",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "threat_score", "id": "1", "type": "max" }],
+          "query": "",
+          "refId": "B",
+          "timeField": "@timestamp"
+        },
+        {
+          "alias": "P95 Threat Score",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": "0" }, "type": "date_histogram" }],
+          "metrics": [{ "field": "threat_score", "id": "1", "settings": { "percents": ["95"] }, "type": "percentiles" }],
+          "query": "",
+          "refId": "C",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1 }
+        }
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 31 },
+      "id": 10,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" } },
+      "title": "Threat Score Distribution",
+      "type": "timeseries",
+      "targets": [
+        {
+          "alias": "{{key}}",
+          "bucketAggs": [
+            { "field": "threat_score", "id": "3", "settings": { "interval": "10", "min_doc_count": "0" }, "type": "histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ruby-guardian", "attacks"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+        "definition": "{\"find\": \"terms\", \"field\": \"attack.category\"}",
+        "includeAll": true,
+        "multi": true,
+        "name": "attack_category",
+        "query": "{\"find\": \"terms\", \"field\": \"attack.category\"}",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "rg-es-events" },
+        "definition": "{\"find\": \"terms\", \"field\": \"severity\"}",
+        "includeAll": true,
+        "multi": true,
+        "name": "severity",
+        "query": "{\"find\": \"terms\", \"field\": \"severity\"}",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "RubyGuardian - Attack Metrics",
+  "uid": "rg-attack-metrics",
+  "version": 1
+}

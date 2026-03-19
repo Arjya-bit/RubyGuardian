@@ -1,0 +1,128 @@
+{
+  "index_patterns": ["rg-ml-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.lifecycle.name": "rg-ml-policy",
+      "index.lifecycle.rollover_alias": "rg-ml"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "classification_id": { "type": "keyword" },
+        "model": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "keyword" },
+            "version": { "type": "keyword" },
+            "type": { "type": "keyword" },
+            "training_date": { "type": "date" }
+          }
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "keyword" },
+            "source": { "type": "keyword" },
+            "hash_sha256": { "type": "keyword" },
+            "size_bytes": { "type": "long" },
+            "code_snippet": { "type": "text" },
+            "filename": { "type": "keyword" },
+            "gem_name": { "type": "keyword" },
+            "gem_version": { "type": "keyword" }
+          }
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "classification": { "type": "keyword" },
+            "confidence": { "type": "float" },
+            "is_malicious": { "type": "boolean" },
+            "threat_category": { "type": "keyword" },
+            "risk_level": { "type": "keyword" },
+            "probabilities": {
+              "type": "object",
+              "properties": {
+                "benign": { "type": "float" },
+                "suspicious": { "type": "float" },
+                "malicious": { "type": "float" },
+                "process_hollowing": { "type": "float" },
+                "cicd_poisoning": { "type": "float" },
+                "lolruby": { "type": "float" },
+                "objectspace_abuse": { "type": "float" },
+                "code_injection": { "type": "float" }
+              }
+            }
+          }
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "entropy": { "type": "float" },
+            "eval_count": { "type": "integer" },
+            "exec_count": { "type": "integer" },
+            "system_call_count": { "type": "integer" },
+            "obfuscation_score": { "type": "float" },
+            "network_calls": { "type": "integer" },
+            "file_operations": { "type": "integer" },
+            "dynamic_method_count": { "type": "integer" },
+            "string_encoding_layers": { "type": "integer" },
+            "ast_depth": { "type": "integer" },
+            "ast_node_count": { "type": "integer" },
+            "suspicious_patterns": { "type": "keyword" },
+            "feature_vector": { "type": "dense_vector", "dims": 128 }
+          }
+        },
+        "explainability": {
+          "type": "object",
+          "properties": {
+            "top_features": {
+              "type": "nested",
+              "properties": {
+                "feature_name": { "type": "keyword" },
+                "importance": { "type": "float" },
+                "value": { "type": "float" }
+              }
+            },
+            "attention_regions": {
+              "type": "nested",
+              "properties": {
+                "start_line": { "type": "integer" },
+                "end_line": { "type": "integer" },
+                "score": { "type": "float" },
+                "snippet": { "type": "text" }
+              }
+            },
+            "similar_known_samples": { "type": "keyword" }
+          }
+        },
+        "performance": {
+          "type": "object",
+          "properties": {
+            "inference_time_ms": { "type": "float" },
+            "preprocessing_time_ms": { "type": "float" },
+            "total_time_ms": { "type": "float" }
+          }
+        },
+        "feedback": {
+          "type": "object",
+          "properties": {
+            "analyst_verdict": { "type": "keyword" },
+            "feedback_time": { "type": "date" },
+            "correct": { "type": "boolean" },
+            "notes": { "type": "text" }
+          }
+        },
+        "tags": { "type": "keyword" }
+      }
+    }
+  },
+  "_meta": {
+    "description": "RubyGuardian ML classification results index template",
+    "version": "1.0.0"
+  }
+}

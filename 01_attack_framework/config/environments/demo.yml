@@ -1,0 +1,19 @@
+# Demo environment settings (safe defaults)
+environment: demo
+
+logging:
+  level: info
+  format: pretty
+  console: true
+
+safety:
+  require_confirmation: true
+  dry_run: false
+  sandbox_check: true
+
+network:
+  c2_host: "127.0.0.1"
+  c2_port: 4444
+  allowed_targets:
+    - "127.0.0.1"
+    - "172.17.0.0/16"

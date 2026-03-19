@@ -1,0 +1,179 @@
+# =============================================================================
+# RubyGuardian - Detection Engine ConfigMap
+# =============================================================================
+# Runtime configuration for the detection agent DaemonSet.
+# Includes alert thresholds, Elasticsearch connection info, and the
+# YAML-based detection rule set.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: detection-config
+  namespace: rubyguardian
+  labels:
+    app.kubernetes.io/name: detection-agent
+    app.kubernetes.io/component: detection
+    app.kubernetes.io/part-of: rubyguardian
+data:
+  # --- Agent settings ---
+  log_level: "info"
+  log_format: "json"
+  elasticsearch_url: "http://elasticsearch-svc.rubyguardian.svc.cluster.local:9200"
+  alert_level: "medium"
+  alert_index: "rubyguardian-alerts"
+  telemetry_index: "rubyguardian-telemetry"
+
+  # --- Monitor intervals (seconds) ---
+  process_scan_interval: "5"
+  network_scan_interval: "10"
+  filesystem_scan_interval: "30"
+  memory_scan_interval: "60"
+
+  # --- Classifier integration ---
+  classifier_url: "http://ml-classifier-svc.rubyguardian.svc.cluster.local:8000"
+  classifier_enabled: "true"
+  classifier_timeout_ms: "5000"
+
+  # --- Detection rules ---
+  rules.yml: |
+    ---
+    version: "1.0"
+    rules:
+      # ─── Process Hollowing Detection ──────────────────────────────────
+      - id: RG-PROC-001
+        name: "Process Hollowing via Fiddle"
+        severity: critical
+        mitre_attack:
+          tactic: defense-evasion
+          technique: T1055.012
+        description: >
+          Detects Ruby processes that use Fiddle/FFI to call process memory
+          manipulation APIs (VirtualAllocEx, WriteProcessMemory, etc.).
+        conditions:
+          - type: api_call
+            pattern: "(VirtualAllocEx|WriteProcessMemory|NtUnmapViewOfSection|CreateRemoteThread)"
+          - type: library_load
+            pattern: "(fiddle|ffi)"
+        action: alert_and_capture
+        tags:
+          - process-injection
+          - fileless
+
+      # ─── Suspicious eval / instance_eval ──────────────────────────────
+      - id: RG-EVAL-001
+        name: "Obfuscated eval Execution"
+        severity: high
+        mitre_attack:
+          tactic: execution
+          technique: T1059
+        description: >
+          Detects eval, instance_eval, or class_eval called with Base64-
+          decoded or otherwise obfuscated payloads.
+        conditions:
+          - type: method_call
+            pattern: "(eval|instance_eval|class_eval|module_eval)"
+          - type: argument_pattern
+            pattern: "(Base64\\.decode64|pack\\(|unpack\\(|\\.chr)"
+        action: alert_and_classify
+        tags:
+          - code-execution
+          - obfuscation
+
+      # ─── Reverse Shell Detection ──────────────────────────────────────
+      - id: RG-NET-001
+        name: "Reverse Shell Attempt"
+        severity: critical
+        mitre_attack:
+          tactic: command-and-control
+          technique: T1059.004
+        description: >
+          Detects Ruby processes that open outbound TCP connections and
+          redirect STDIN/STDOUT/STDERR to the socket.
+        conditions:
+          - type: syscall
+            pattern: "(connect|dup2)"
+          - type: fd_redirect
+            target: "[0-2]"
+        action: alert_and_block
+        tags:
+          - reverse-shell
+          - c2
+
+      # ─── ObjectSpace Persistence ──────────────────────────────────────
+      - id: RG-OBJ-001
+        name: "ObjectSpace Abuse for Persistence"
+        severity: high
+        mitre_attack:
+          tactic: persistence
+          technique: T1546
+        description: >
+          Detects manipulation of Ruby ObjectSpace to inject persistent
+          objects or modify existing class hierarchies at runtime.
+        conditions:
+          - type: method_call
+            pattern: "ObjectSpace\\.(define_finalizer|each_object|_id2ref)"
+          - type: class_modification
+            pattern: "(prepend|define_method|alias_method|remove_method)"
+        action: alert_and_capture
+        tags:
+          - persistence
+          - runtime-manipulation
+
+      # ─── LoLRuby — Living off the Land ────────────────────────────────
+      - id: RG-LOL-001
+        name: "LoLRuby System Command Execution"
+        severity: medium
+        mitre_attack:
+          tactic: execution
+          technique: T1059
+        description: >
+          Detects Ruby scripts using system, exec, backtick, or Open3 to
+          execute suspicious system commands.
+        conditions:
+          - type: method_call
+            pattern: "(system|exec|%x|Open3\\.|IO\\.popen|Kernel\\.spawn)"
+          - type: argument_pattern
+            pattern: "(curl|wget|nc |ncat|bash -i|/dev/tcp|powershell)"
+        action: alert_and_classify
+        tags:
+          - lolbins
+          - command-execution
+
+      # ─── CI/CD Pipeline Poisoning ─────────────────────────────────────
+      - id: RG-CICD-001
+        name: "Gem Install Hook Abuse"
+        severity: high
+        mitre_attack:
+          tactic: persistence
+          technique: T1195.002
+        description: >
+          Detects gems with post_install hooks that execute arbitrary code
+          or download external payloads during bundle install.
+        conditions:
+          - type: gem_hook
+            pattern: "post_install_message|extensions"
+          - type: network_call
+            pattern: "(Net::HTTP|open-uri|Faraday|HTTParty)"
+        action: alert_and_block
+        tags:
+          - supply-chain
+          - cicd-poisoning
+
+      # ─── Suspicious File Operations ──────────────────────────────────
+      - id: RG-FILE-001
+        name: "Sensitive File Access"
+        severity: medium
+        mitre_attack:
+          tactic: credential-access
+          technique: T1552.001
+        description: >
+          Detects Ruby processes accessing credential files, SSH keys,
+          or environment files.
+        conditions:
+          - type: file_access
+            pattern: "(\\.env|credentials|secrets\\.yml|id_rsa|known_hosts|shadow|passwd)"
+        action: alert
+        tags:
+          - credential-access
+          - file-access

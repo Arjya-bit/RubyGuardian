@@ -1,0 +1,143 @@
+# RubyGuardian - Process Hollowing Detection Signatures
+# =====================================================
+# Detects techniques where a Ruby process is hollowed out and replaced
+# with malicious code while maintaining the original process appearance.
+
+signatures:
+  - id: PH-001
+    name: "Classic Process Hollowing via Fork+Exec"
+    description: >
+      Detects the classic process hollowing pattern where a Ruby process
+      forks, suspends the child, unmaps its memory, writes new code,
+      and resumes execution.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055.012
+    indicators:
+      syscall_sequence:
+        window_ms: 5000
+        ordered: true
+        syscalls:
+          - fork
+          - ptrace:PTRACE_ATTACH
+          - mmap:PROT_READ|PROT_WRITE
+          - process_vm_writev
+          - ptrace:PTRACE_DETACH
+      process:
+        parent_is_ruby: true
+    score: 95
+    tags: [process_hollowing, injection, evasion]
+
+  - id: PH-002
+    name: "Memory Region Replacement"
+    description: >
+      Detects when a Ruby process unmaps legitimate memory regions and
+      replaces them with new executable mappings.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055.012
+    indicators:
+      syscall_sequence:
+        window_ms: 3000
+        ordered: true
+        syscalls:
+          - munmap
+          - mmap:PROT_READ|PROT_WRITE|PROT_EXEC
+      memory:
+        new_rwx_region: true
+        region_not_in_whitelist: true
+    score: 90
+    tags: [process_hollowing, memory_manipulation]
+
+  - id: PH-003
+    name: "Ruby Fiddle-based Process Hollowing"
+    description: >
+      Detects use of Ruby's Fiddle library to perform process hollowing
+      by directly calling libc functions for memory manipulation.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055.012
+    indicators:
+      ruby_api:
+        classes_used:
+          - Fiddle::Pointer
+          - Fiddle::Function
+        methods_called:
+          - dlopen
+          - dlsym
+        suspicious_symbols:
+          - mmap
+          - mprotect
+          - memcpy
+          - ptrace
+      syscall_sequence:
+        window_ms: 10000
+        syscalls:
+          - mmap
+          - mprotect
+    score: 92
+    tags: [process_hollowing, fiddle, ffi]
+
+  - id: PH-004
+    name: "Process Image Replacement via memfd_create"
+    description: >
+      Detects use of memfd_create to create anonymous file-backed memory
+      for replacing process image in memory.
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055.012
+    indicators:
+      syscall_sequence:
+        window_ms: 5000
+        ordered: true
+        syscalls:
+          - memfd_create
+          - write  # Writing to the memfd
+          - execve  # Executing from /proc/self/fd/N
+      process:
+        execve_from_memfd: true
+    score: 93
+    tags: [process_hollowing, memfd, fileless]
+
+  - id: PH-005
+    name: "Thread Context Hijacking"
+    description: >
+      Detects modification of thread context registers to redirect
+      execution flow in a Ruby process's native threads.
+    severity: critical
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1055.012
+    indicators:
+      syscall_sequence:
+        window_ms: 3000
+        syscalls:
+          - ptrace:PTRACE_GETREGS
+          - ptrace:PTRACE_SETREGS
+      process:
+        target_is_ruby: true
+    score: 95
+    tags: [process_hollowing, thread_hijack]
+
+  - id: PH-006
+    name: "Suspicious Process Tree After Hollowing"
+    description: >
+      Detects when a Ruby process's child exhibits behavior inconsistent
+      with its command line (e.g., named 'ruby' but making non-Ruby syscalls).
+    severity: high
+    mitre_attack:
+      tactic: defense-evasion
+      technique: T1036.004
+    indicators:
+      process:
+        cmdline_contains: ruby
+        behavior_mismatch: true
+      anomaly:
+        unexpected_network_activity: true
+        unexpected_file_access: true
+    score: 80
+    tags: [process_hollowing, masquerading]
