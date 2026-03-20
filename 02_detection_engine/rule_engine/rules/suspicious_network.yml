@@ -1,0 +1,69 @@
+# RubyGuardian Detection Rule: Suspicious Network Activity
+# Detects outbound connections to known-malicious patterns from Ruby processes
+
+rule:
+  id: RG-DET-NET-001
+  name: Suspicious Outbound Connection
+  description: >
+    Detects Ruby processes making outbound connections to suspicious destinations
+    including known C2 ports, Tor exit nodes, and unusual DNS patterns.
+  version: "1.0"
+  author: RubyGuardian Research Team
+  severity: high
+  enabled: true
+
+mitre_attack:
+  technique: T1071.001
+  tactic: command-and-control
+  name: Application Layer Protocol - Web Protocols
+
+conditions:
+  any:
+    - field: event.dest_port
+      operator: in
+      value: [4444, 5555, 6666, 8443, 9001, 31337, 12345]
+      description: "Common C2/backdoor ports"
+
+    - field: event.dest_ip
+      operator: regex
+      value: "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)"
+      negate: true
+      description: "External (non-RFC1918) destination"
+      additional:
+        - field: event.bytes_sent
+          operator: greater_than
+          value: 10240
+          description: "More than 10KB sent (potential exfiltration)"
+
+    - field: event.dns_query
+      operator: regex
+      value: "^[a-f0-9]{32,}\\."
+      description: "Hex-encoded DNS exfiltration pattern"
+
+    - field: event.connection_count
+      operator: greater_than
+      value: 50
+      time_window: 60
+      description: "Rapid connection attempts (port scanning or C2 beaconing)"
+
+correlation:
+  enabled: true
+  group_by: event.pid
+  time_window: 300
+  min_events: 3
+  escalate_severity: critical
+
+actions:
+  - type: alert
+    channels: [log, webhook, siem]
+  - type: enrich
+    lookup: threat_intel
+    fields: [dest_ip, dest_port]
+  - type: snapshot
+    capture: [process_tree, open_files, network_connections]
+
+exceptions:
+  - field: event.process_name
+    operator: in
+    value: [bundler, gem, ruby-lsp]
+    description: "Known package manager network activity"

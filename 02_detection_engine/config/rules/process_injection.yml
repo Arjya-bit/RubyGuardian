@@ -1,0 +1,179 @@
+# RubyGuardian Detection Rule: Process Injection Techniques
+# Detects various forms of process injection including DLL injection,
+# process hollowing, and APC injection.
+#
+# References:
+#   - MITRE ATT&CK T1055 (Process Injection)
+#   - https://attack.mitre.org/techniques/T1055/
+
+---
+rules:
+  - id: PI-001
+    name: Suspicious Process Memory Access
+    description: >
+      Detects processes accessing other process memory with high-privilege
+      access masks commonly used in process injection (PROCESS_ALL_ACCESS,
+      PROCESS_VM_WRITE + PROCESS_VM_OPERATION).
+    severity: high
+    status: enabled
+    tags:
+      - process_injection
+      - defense_evasion
+      - privilege_escalation
+    mitre_attack:
+      tactics:
+        - Defense Evasion
+        - Privilege Escalation
+      techniques:
+        - T1055
+        - T1055.001
+        - T1055.012
+    conditions:
+      and:
+        - field: event_type
+          op: eq
+          value: process_access
+        - field: access_mask
+          op: in
+          value:
+            - "0x1F0FFF"    # PROCESS_ALL_ACCESS
+            - "0x001F0FFF"  # PROCESS_ALL_ACCESS (alternate)
+            - "0x1FFFFF"    # Full access
+        - not:
+            - field: source_process.name
+              op: in
+              value:
+                - csrss.exe
+                - lsass.exe
+                - services.exe
+                - svchost.exe
+                - MsMpEng.exe
+                - vmtoolsd.exe
+        - field: target_process.name
+          op: not_in
+          value:
+            - chrome.exe
+            - firefox.exe
+    response:
+      alert: true
+      collect_memory_dump: false
+      isolate_host: false
+
+  - id: PI-002
+    name: Classic DLL Injection via CreateRemoteThread
+    description: >
+      Detects the classic DLL injection pattern using CreateRemoteThread
+      API call targeting another process, particularly when combined with
+      WriteProcessMemory and VirtualAllocEx.
+    severity: critical
+    status: enabled
+    tags:
+      - dll_injection
+      - process_injection
+    mitre_attack:
+      tactics:
+        - Defense Evasion
+        - Privilege Escalation
+      techniques:
+        - T1055.001
+    conditions:
+      and:
+        - field: event_type
+          op: eq
+          value: api_call
+        - field: api_name
+          op: in
+          value:
+            - CreateRemoteThread
+            - NtCreateThreadEx
+            - RtlCreateUserThread
+        - field: cross_process
+          op: eq
+          value: true
+        - or:
+            - field: call_stack
+              op: matches
+              value: "VirtualAllocEx.*WriteProcessMemory.*CreateRemoteThread"
+            - field: injected_module
+              op: matches
+              value: "\\.(dll|DLL)$"
+    response:
+      alert: true
+      collect_memory_dump: true
+
+  - id: PI-003
+    name: Process Hollowing Detection
+    description: >
+      Detects process hollowing technique where a legitimate process is
+      created in suspended state, its memory is unmapped, and malicious
+      code is written into the process space.
+    severity: critical
+    status: enabled
+    tags:
+      - process_hollowing
+      - process_injection
+    mitre_attack:
+      tactics:
+        - Defense Evasion
+      techniques:
+        - T1055.012
+    conditions:
+      and:
+        - field: event_type
+          op: eq
+          value: process_create
+        - field: creation_flags
+          op: contains
+          value: CREATE_SUSPENDED
+        - or:
+            - field: parent_process.name
+              op: not_in
+              value:
+                - smss.exe
+                - csrss.exe
+                - wininit.exe
+                - services.exe
+                - svchost.exe
+            - field: api_sequence
+              op: contains
+              value: NtUnmapViewOfSection
+    response:
+      alert: true
+      collect_memory_dump: true
+      isolate_host: true
+
+  - id: PI-004
+    name: APC Injection Attempt
+    description: >
+      Detects Asynchronous Procedure Call (APC) injection where malicious
+      code is injected via QueueUserAPC into a thread of another process.
+    severity: high
+    status: enabled
+    tags:
+      - apc_injection
+      - process_injection
+    mitre_attack:
+      tactics:
+        - Defense Evasion
+        - Privilege Escalation
+      techniques:
+        - T1055.004
+    conditions:
+      and:
+        - field: event_type
+          op: eq
+          value: api_call
+        - field: api_name
+          op: eq
+          value: QueueUserAPC
+        - field: cross_process
+          op: eq
+          value: true
+        - field: source_process.integrity_level
+          op: not_in
+          value:
+            - System
+            - High
+    response:
+      alert: true
+      collect_memory_dump: true

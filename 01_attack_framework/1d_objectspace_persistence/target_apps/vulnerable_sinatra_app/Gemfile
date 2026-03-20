@@ -1,0 +1,61 @@
+# frozen_string_literal: true
+#
+# RubyGuardian - Vulnerable Sinatra App Dependencies
+# PURPOSE: Educational security research only
+# WARNING: These gem versions contain KNOWN vulnerabilities.
+#          Do NOT use these versions in production applications.
+
+source 'https://rubygems.org'
+
+# Web framework
+gem 'sinatra', '2.0.5'            # Older version with known issues
+gem 'sinatra-contrib', '2.0.5'    # Includes sinatra/reloader
+
+# Web server
+gem 'thin', '1.7.2'               # CVE-2019-16782 (header parsing)
+gem 'rack', '2.0.6'               # CVE-2020-8184 (cookie injection)
+
+# Database
+gem 'sqlite3', '~> 1.3.6'
+gem 'sequel', '5.15.0'            # Older version
+
+# Template engines
+gem 'erubis', '2.7.0'             # Older ERB engine
+gem 'tilt', '2.0.9'
+
+# JSON handling
+gem 'json', '2.1.0'               # CVE-2020-10663
+gem 'multi_json', '1.13.1'
+gem 'oj', '3.7.0'
+
+# HTTP client (for SSRF demonstrations)
+gem 'httparty', '0.16.4'
+gem 'rest-client', '1.6.14'       # Known supply chain attack in this version
+
+# XML parsing
+gem 'nokogiri', '1.10.3'          # CVE-2019-5477 (command injection)
+gem 'rexml'
+
+# YAML processing
+gem 'psych', '3.0.2'              # Deserialization risks
+
+# File uploads
+gem 'rack-file', '0.0.1'
+
+# Authentication (minimal)
+gem 'bcrypt', '3.1.12'
+
+# Session storage
+gem 'rack-session', '0.0.1'
+
+group :development do
+  gem 'pry'
+  gem 'pry-byebug'
+  gem 'shotgun'                    # Auto-reload for development
+end
+
+group :test do
+  gem 'rack-test', '~> 1.1'
+  gem 'rspec', '~> 3.8'
+  gem 'capybara', '~> 3.12'
+end

@@ -1,0 +1,41 @@
+# RubyGuardian - Attacker VM Configuration
+# Used by Vagrantfile to configure the red-team simulation host
+
+network:
+  ip: "172.30.0.10"
+  netmask: "255.255.0.0"
+  hostname: "rg-attacker"
+
+resources:
+  memory: 2048
+  cpus: 2
+
+ruby:
+  version: "3.3.0"
+  gems:
+    - bundler
+    - pry
+    - ffi
+
+tools:
+  - metasploit-framework
+  - nmap
+  - sqlmap
+
+attack_modules:
+  process_hollowing:
+    enabled: true
+    dry_run: true
+  cicd_poisoning:
+    enabled: true
+    c2_port: 8443
+  lolruby:
+    enabled: true
+  objectspace_persistence:
+    enabled: true
+    target_app: vulnerable_rails_app
+
+logging:
+  level: debug
+  output: /var/log/ruby-guardian/attacker.log
+  syslog_forward: "172.28.0.10:514"

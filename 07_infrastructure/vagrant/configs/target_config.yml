@@ -1,0 +1,38 @@
+# RubyGuardian - Target VM Configuration
+# Used by Vagrantfile to configure the victim host
+
+network:
+  ip: "172.30.0.20"
+  netmask: "255.255.0.0"
+  hostname: "rg-target"
+
+resources:
+  memory: 2048
+  cpus: 2
+
+ruby:
+  version: "3.3.0"
+  gems:
+    - rails
+    - sinatra
+    - puma
+    - bundler
+
+services:
+  rails_app:
+    enabled: true
+    port: 3000
+    environment: development
+  sinatra_app:
+    enabled: true
+    port: 4567
+
+detection_agent:
+  enabled: true
+  config_path: /opt/rubyguardian/02_detection_engine/config/agent.yml
+  monitor_endpoint: "http://172.28.0.10:9200"
+
+logging:
+  level: info
+  output: /var/log/ruby-guardian/target.log
+  syslog_forward: "172.28.0.10:514"

@@ -1,0 +1,83 @@
+# RubyGuardian Sample Network Capture Description - Normal HTTP Traffic
+# This file describes the expected network patterns of a benign Ruby web application
+# for use in detection rule testing and ML classifier training.
+#
+# Source: Production Ruby on Rails application (Puma web server)
+# Duration: 5 minutes of typical traffic
+# Environment: Kubernetes pod, internal service mesh
+
+== Connection Summary ==
+Total Connections: 247
+Unique Source IPs: 15
+Unique Destination IPs: 4
+Protocols: TCP (HTTP/1.1, HTTP/2), TCP (PostgreSQL), TCP (Redis)
+Average Connection Duration: 85ms
+Max Connection Duration: 2.1s (database query)
+
+== Traffic Patterns ==
+
+--- Inbound HTTP (Port 3000) ---
+Source: 10.0.0.0/16 (internal load balancer and service mesh)
+Methods: GET (68%), POST (22%), PUT (7%), DELETE (3%)
+Response Codes: 200 (85%), 201 (8%), 304 (4%), 404 (2%), 500 (1%)
+Average Request Size: 450 bytes
+Average Response Size: 12,400 bytes
+Requests/Second: 48.2 (sustained average)
+Peak Requests/Second: 125 (burst)
+
+Sample requests:
+  10.0.0.5:52340 -> 10.0.1.100:3000  GET /api/v1/users  200 OK  245B->3.2KB  12ms
+  10.0.0.5:52341 -> 10.0.1.100:3000  GET /api/v1/products  200 OK  198B->15.8KB  45ms
+  10.0.0.6:48820 -> 10.0.1.100:3000  POST /api/v1/orders  201 Created  1.2KB->512B  89ms
+  10.0.0.7:39210 -> 10.0.1.100:3000  GET /health  200 OK  180B->52B  2ms
+  10.0.0.5:52345 -> 10.0.1.100:3000  GET /assets/app.js  304 Not Modified  220B->0B  1ms
+
+--- Outbound Database (Port 5432) ---
+Destination: 10.0.2.50:5432 (PostgreSQL primary)
+Connection Type: Persistent connection pool (5 connections)
+Queries/Second: 35.8
+Average Query Time: 8.2ms
+Max Query Time: 450ms (complex join)
+Bytes Sent: 2.1 MB (queries)
+Bytes Received: 18.5 MB (result sets)
+
+Sample queries (from wire):
+  SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT 1
+  INSERT INTO "orders" ("user_id", "total", "created_at") VALUES ($1, $2, $3)
+  SELECT COUNT(*) FROM "products" WHERE "products"."active" = TRUE
+
+--- Outbound Cache (Port 6379) ---
+Destination: 10.0.2.60:6379 (Redis)
+Connection Type: Persistent (2 connections)
+Commands/Second: 92.5
+Average Latency: 0.8ms
+Bytes Sent: 450 KB
+Bytes Received: 2.8 MB
+
+Sample commands:
+  GET session:abc123def456
+  SET cache:products:list [JSON] EX 300
+  INCR rate_limit:10.0.0.5
+
+--- DNS (Port 53) ---
+Destination: 10.0.0.2:53 (cluster DNS)
+Queries: 12 total (all A/AAAA records)
+Average Response Time: 1.2ms
+All queries resolve to internal addresses
+
+Sample queries:
+  postgres-primary.database.svc.cluster.local  A  -> 10.0.2.50
+  redis-master.cache.svc.cluster.local  A  -> 10.0.2.60
+  api-gateway.ingress.svc.cluster.local  A  -> 10.0.0.5
+
+== Behavioral Indicators (All Normal) ==
+- No outbound connections to external IPs
+- No connections to non-standard ports
+- DNS queries only for known internal services
+- Consistent request/response size ratios
+- No encrypted traffic to unknown destinations
+- No UDP traffic except DNS
+- Connection pool reuse patterns normal
+- No SYN scanning or port probing behavior
+- TLS certificates valid for all HTTPS connections
+- No base64-encoded DNS subdomain queries

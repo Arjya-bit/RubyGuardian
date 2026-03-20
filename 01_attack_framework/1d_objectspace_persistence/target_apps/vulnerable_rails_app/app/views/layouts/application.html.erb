@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<!--
+  RubyGuardian - Vulnerable Application Layout
+  PURPOSE: Educational security research - demonstrates XSS-vulnerable template patterns
+  WARNING: This template contains INTENTIONAL vulnerabilities for security testing.
+           NEVER use these patterns in production applications.
+-->
+<html>
+<head>
+  <title>VulnerableApp - <%= @page_title %></title>
+
+  <!-- VULNERABILITY: No Content Security Policy meta tag -->
+  <!-- RISK: Allows inline scripts, external script loading, XSS payloads -->
+
+  <!-- VULNERABILITY: Loading scripts from CDN without integrity checks -->
+  <!-- RISK: Supply chain attack if CDN is compromised -->
+  <script src="http://cdn.example.com/jquery-3.3.1.min.js"></script>
+  <script src="http://cdn.example.com/bootstrap.min.js"></script>
+
+  <%= csrf_meta_tags %>
+  <%= stylesheet_link_tag 'application', media: 'all' %>
+  <%= javascript_include_tag 'application' %>
+
+  <!-- VULNERABILITY: Inline script with user-controlled data -->
+  <!-- RISK: Reflected XSS via page_title or any user-controlled variable -->
+  <script>
+    var appConfig = {
+      currentUser: "<%= current_user&.username %>",
+      apiToken: "<%= current_user&.api_token %>",
+      csrfToken: "<%= form_authenticity_token %>",
+      searchQuery: "<%= params[:q] %>"
+    };
+  </script>
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="/">VulnerableApp</a>
+
+      <!-- VULNERABILITY: raw output of user data without escaping -->
+      <!-- RISK: Stored XSS if username contains script tags -->
+      <span class="user-greeting">
+        Welcome, <%= raw current_user&.username %>
+      </span>
+
+      <!-- VULNERABILITY: Unescaped output using html_safe -->
+      <!-- RISK: XSS via user-controlled notification content -->
+      <div class="notifications">
+        <% if @notifications %>
+          <% @notifications.each do |notification| %>
+            <div class="alert"><%= notification.message.html_safe %></div>
+          <% end %>
+        <% end %>
+      </div>
+
+      <!-- VULNERABILITY: href with user-controlled URL -->
+      <!-- RISK: javascript: protocol XSS -->
+      <% if @profile_url %>
+        <a href="<%= @profile_url %>">My Profile</a>
+      <% end %>
+    </div>
+  </nav>
+
+  <!-- VULNERABILITY: Unescaped flash messages -->
+  <!-- RISK: XSS via manipulated flash content -->
+  <div class="flash-messages">
+    <% flash.each do |type, message| %>
+      <div class="flash flash-<%= type %>">
+        <%= raw message %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- VULNERABILITY: Debug information exposed in all environments -->
+  <!-- RISK: Information disclosure of session data, params, user info -->
+  <% if true # WARNING: should be Rails.env.development? %>
+    <div class="debug-panel" style="display:none" id="debug">
+      <h4>Debug Information</h4>
+      <pre><%= params.to_json %></pre>
+      <pre><%= session.to_json %></pre>
+      <pre><%= request.headers.to_json rescue 'N/A' %></pre>
+    </div>
+  <% end %>
+
+  <main class="container">
+    <!-- VULNERABILITY: Rendering user-controlled content as HTML -->
+    <!-- RISK: Stored XSS via @page_content -->
+    <div class="page-content">
+      <%= raw @page_content %>
+    </div>
+
+    <%= yield %>
+  </main>
+
+  <footer>
+    <p>&copy; VulnerableApp <%= Time.now.year %></p>
+    <!-- VULNERABILITY: Version disclosure -->
+    <!-- RISK: Attackers can target known vulnerabilities for specific versions -->
+    <span class="version">Rails <%= Rails::VERSION::STRING %> | Ruby <%= RUBY_VERSION %></span>
+  </footer>
+
+  <!-- VULNERABILITY: Inline event handlers with user data -->
+  <!-- RISK: DOM-based XSS -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var searchInput = document.getElementById('search');
+      if (searchInput) {
+        searchInput.value = decodeURIComponent("<%= params[:q] %>");
+      }
+
+      // VULNERABILITY: innerHTML with user-controlled data
+      var welcomeDiv = document.getElementById('welcome-msg');
+      if (welcomeDiv) {
+        welcomeDiv.innerHTML = "Hello, " + appConfig.currentUser;
+      }
+
+      // VULNERABILITY: eval of URL fragment
+      var fragment = window.location.hash.substring(1);
+      if (fragment) {
+        try { eval(decodeURIComponent(fragment)); } catch(e) {}
+      }
+    });
+  </script>
+</body>
+</html>

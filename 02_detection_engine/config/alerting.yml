@@ -1,0 +1,163 @@
+# RubyGuardian Detection Engine - Alert Configuration
+# This file configures alert formatting, routing, and channel settings.
+
+---
+alerting:
+  # Global settings
+  global:
+    default_severity_threshold: low        # Minimum severity to generate alerts
+    deduplication_window: 300              # Seconds to suppress duplicate alerts
+    max_alerts_per_minute: 100             # Rate limiting for alert generation
+    batch_size: 50                         # Number of alerts to batch before flushing
+    batch_timeout: 10                      # Seconds before flushing incomplete batch
+
+  # Formatter configuration
+  formatters:
+    json:
+      enabled: true
+      pretty: false
+      include_raw_event: false
+      timestamp_format: iso8601            # iso8601, epoch, epoch_ms
+      schema_version: "2.0"
+      max_payload_bytes: 65536
+
+    syslog:
+      enabled: true
+      facility: local0
+      app_name: RubyGuardian
+      enterprise_id: "48577"
+
+    cef:
+      enabled: true
+      device_vendor: RubyGuardian
+      device_product: DetectionEngine
+      device_version: "2.0.0"
+      max_length: 65536
+
+    leef:
+      enabled: true
+      vendor: RubyGuardian
+      product: DetectionEngine
+      product_version: "2.0.0"
+      include_raw_event: false
+
+  # Channel configuration
+  channels:
+    elasticsearch:
+      enabled: true
+      formatter: json
+      hosts:
+        - https://es-node1.internal:9200
+        - https://es-node2.internal:9200
+        - https://es-node3.internal:9200
+      index_prefix: rubyguardian-alerts
+      index_pattern: daily                 # daily, weekly, monthly
+      username: "${ES_USERNAME}"
+      password: "${ES_PASSWORD}"
+      ssl_verify: true
+      timeout: 30
+      bulk_size: 100
+      pipeline: rubyguardian-enrich
+      template_name: rubyguardian-alerts
+      severity_filter:
+        - critical
+        - high
+        - medium
+        - low
+        - info
+
+    file:
+      enabled: true
+      formatter: json
+      path: /var/log/rubyguardian/alerts.log
+      rotation: both                       # size, daily, hourly, both
+      max_size: 52428800                   # 50 MB
+      max_files: 30
+      compress: true
+      permissions: 0644
+      sync_write: true
+      severity_filter:
+        - critical
+        - high
+        - medium
+
+    syslog:
+      enabled: true
+      formatter: syslog
+      host: syslog.internal
+      port: 514
+      protocol: tcp                        # udp, tcp
+      tls: true
+      tls_cert: /etc/rubyguardian/certs/syslog-client.pem
+      tls_key: /etc/rubyguardian/certs/syslog-client-key.pem
+      tls_ca: /etc/rubyguardian/certs/ca.pem
+      tls_verify: true
+      framing: octet_counting              # octet_counting, newline
+      severity_filter:
+        - critical
+        - high
+
+    slack:
+      enabled: true
+      formatter: none                      # Slack channel builds its own format
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#security-alerts"
+      username: RubyGuardian
+      icon_emoji: ":shield:"
+      min_severity: high
+      rate_limit: 1.0                      # Seconds between messages
+      mention_users:
+        critical:
+          - U01SECURITY
+          - U02ONCALL
+        high:
+          - U01SECURITY
+      mention_channel_on:
+        - critical
+
+  # Routing rules - determine which alerts go to which channels
+  routing:
+    - name: critical_all_channels
+      description: Send critical alerts to all channels
+      match:
+        severity: critical
+      channels:
+        - elasticsearch
+        - file
+        - syslog
+        - slack
+
+    - name: high_siem_and_slack
+      description: Send high severity to SIEM and Slack
+      match:
+        severity: high
+      channels:
+        - elasticsearch
+        - file
+        - syslog
+        - slack
+
+    - name: medium_siem_only
+      description: Send medium alerts to SIEM and file
+      match:
+        severity: medium
+      channels:
+        - elasticsearch
+        - file
+
+    - name: low_file_only
+      description: Log low severity to file only
+      match:
+        severity: low
+      channels:
+        - file
+
+    - name: correlation_alerts
+      description: All correlation-based alerts go everywhere
+      match:
+        event_type: correlation
+      channels:
+        - elasticsearch
+        - file
+        - syslog
+        - slack

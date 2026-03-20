@@ -1,0 +1,97 @@
+# RubyGuardian Detection Engine - Alert Channel Configuration
+# Defines output channels for security alerts
+
+channels:
+  # File-based logging (always enabled)
+  log:
+    enabled: true
+    format: json
+    path: /var/log/ruby-guardian/alerts.json.log
+    rotation:
+      max_size: 100MB
+      max_files: 10
+      compress: true
+    filters:
+      min_severity: low
+
+  # Elasticsearch / OpenSearch
+  elasticsearch:
+    enabled: false
+    hosts:
+      - "http://localhost:9200"
+    index_pattern: "ruby-guardian-alerts-%{+YYYY.MM.dd}"
+    auth:
+      type: basic
+      username: "${RG_ES_USER}"
+      password: "${RG_ES_PASS}"
+    bulk:
+      batch_size: 100
+      flush_interval: 5
+    tls:
+      verify: true
+      ca_cert: /etc/ruby-guardian/certs/ca.pem
+    filters:
+      min_severity: low
+
+  # Webhook (Slack, Teams, PagerDuty, etc.)
+  webhook:
+    enabled: false
+    url: "${RG_WEBHOOK_URL}"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer ${RG_WEBHOOK_TOKEN}"
+    format: json
+    retry:
+      max_attempts: 3
+      backoff_seconds: 5
+    filters:
+      min_severity: high
+    rate_limit:
+      max_per_minute: 10
+
+  # Syslog (RFC 5424)
+  syslog:
+    enabled: false
+    protocol: tcp
+    host: localhost
+    port: 514
+    facility: auth
+    format: cef
+    tls:
+      enabled: false
+    filters:
+      min_severity: medium
+
+  # Slack (dedicated integration)
+  slack:
+    enabled: false
+    webhook_url: "${RG_SLACK_WEBHOOK}"
+    channel: "#security-alerts"
+    username: RubyGuardian
+    icon_emoji: ":shield:"
+    severity_colors:
+      critical: "#FF0000"
+      high: "#FF6600"
+      medium: "#FFCC00"
+      low: "#0066FF"
+    filters:
+      min_severity: high
+    mention_on_critical: "@channel"
+
+# Global settings
+global:
+  deduplication:
+    enabled: true
+    window_seconds: 300
+    key_fields: [rule_id, source_pid, source_ip]
+
+  batching:
+    enabled: true
+    max_batch_size: 50
+    flush_interval_seconds: 10
+
+  rate_limiting:
+    enabled: true
+    max_alerts_per_minute: 100
+    burst_limit: 50

@@ -1,0 +1,148 @@
+<!--
+  RubyGuardian - Vulnerable Admin Template
+  PURPOSE: Educational security research - demonstrates sensitive data exposure
+  WARNING: This template contains INTENTIONAL vulnerabilities.
+           NEVER expose administrative interfaces like this in production.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel - Vulnerable Sinatra App</title>
+  <style>
+    body { font-family: monospace; margin: 20px; background: #1a1a2e; color: #e0e0e0; }
+    h1, h2, h3 { color: #e94560; }
+    .panel { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    .warning-banner { background: #e94560; color: white; padding: 10px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    th { background: #0f3460; }
+    pre { background: #0a0a1a; padding: 10px; overflow-x: auto; }
+    .danger { color: #e94560; }
+    input, textarea { background: #0a0a1a; color: #e0e0e0; border: 1px solid #333; padding: 5px; }
+    button { background: #e94560; color: white; border: none; padding: 8px 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="warning-banner">
+    EDUCATIONAL SECURITY RESEARCH - INTENTIONALLY VULNERABLE ADMIN PANEL
+  </div>
+
+  <h1>Admin Dashboard</h1>
+  <!-- WARNING: No authentication required to access this page -->
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Sensitive data exposure - environment variables      -->
+  <!-- RISK: Credentials, API keys, secrets visible to any visitor         -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>Environment Variables</h2>
+    <p class="danger">WARNING: Exposing environment variables to the browser</p>
+    <table>
+      <tr><th>Variable</th><th>Value</th></tr>
+      <% ENV.each do |key, value| %>
+        <tr>
+          <td><%= key %></td>
+          <!-- WARNING: All env vars including secrets are displayed -->
+          <td><pre><%= value %></pre></td>
+        </tr>
+      <% end %>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Database contents exposed without authorization      -->
+  <!-- RISK: Complete data breach - all user records visible               -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>User Database</h2>
+    <table>
+      <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th></tr>
+      <% DB.execute("SELECT * FROM users").each do |row| %>
+        <tr>
+          <td><%= row[0] %></td>
+          <td><%= row[1] %></td>
+          <td><%= row[2] %></td>
+          <td><%= row[3] %></td>
+        </tr>
+      <% end %>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Server configuration and runtime info exposed        -->
+  <!-- RISK: Information disclosure aids targeted attacks                   -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>Server Information</h2>
+    <table>
+      <tr><td>Ruby Version</td><td><%= RUBY_VERSION %></td></tr>
+      <tr><td>Ruby Platform</td><td><%= RUBY_PLATFORM %></td></tr>
+      <tr><td>Rack Environment</td><td><%= ENV['RACK_ENV'] %></td></tr>
+      <tr><td>Process ID</td><td><%= Process.pid %></td></tr>
+      <tr><td>Working Directory</td><td><%= Dir.pwd %></td></tr>
+      <tr><td>Load Path</td><td><pre><%= $LOAD_PATH.join("\n") %></pre></td></tr>
+      <tr><td>Loaded Gems</td><td><pre><%= Gem.loaded_specs.keys.join("\n") rescue 'N/A' %></pre></td></tr>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Arbitrary SQL execution interface                    -->
+  <!-- RISK: Complete database compromise                                  -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>SQL Console</h2>
+    <p class="danger">WARNING: Direct SQL execution interface exposed</p>
+    <form action="/users/search" method="get">
+      <textarea name="q" rows="3" cols="60"
+        placeholder="Enter search query (injected into SQL)..."></textarea>
+      <br>
+      <button type="submit">Execute Search</button>
+    </form>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: File browser with path traversal                     -->
+  <!-- RISK: Arbitrary file read from server filesystem                    -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>File Browser</h2>
+    <form action="/download" method="get">
+      <input type="text" name="path" size="60"
+        placeholder="/path/to/file" value="/etc/hostname">
+      <button type="submit">Download</button>
+    </form>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Code execution interface                             -->
+  <!-- RISK: Arbitrary Ruby code execution on the server                   -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>Ruby Console</h2>
+    <form action="/calc" method="get">
+      <textarea name="expr" rows="3" cols="60"
+        placeholder="Ruby expression to evaluate...">1 + 1</textarea>
+      <br>
+      <button type="submit">Evaluate</button>
+    </form>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- VULNERABILITY: Session data exposed                                 -->
+  <!-- RISK: Session tokens and internal state visible                     -->
+  <!-- =================================================================== -->
+  <div class="panel">
+    <h2>Current Session</h2>
+    <pre><%= session.to_hash.inspect %></pre>
+  </div>
+
+  <div class="panel">
+    <h2>Request Headers</h2>
+    <table>
+      <% request.env.select { |k, _| k.start_with?('HTTP_') }.each do |key, value| %>
+        <tr><td><%= key %></td><td><%= value %></td></tr>
+      <% end %>
+    </table>
+  </div>
+</body>
+</html>

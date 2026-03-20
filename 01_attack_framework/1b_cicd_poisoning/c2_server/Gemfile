@@ -1,0 +1,76 @@
+# =============================================================================
+# RubyGuardian - Gemfile for Simulated C2 Server
+# =============================================================================
+#
+# EDUCATIONAL DISCLAIMER:
+#   These dependencies support the simulated C2 server for CI/CD poisoning
+#   research. The server performs NO malicious operations; it only logs
+#   simulated agent interactions for educational analysis.
+#
+# Install: bundle install
+# Run:     bundle exec ruby server.rb
+# =============================================================================
+
+source 'https://rubygems.org'
+
+# Ruby version constraint
+ruby '>= 3.0.0'
+
+# ---------------------------------------------------------------------------
+# Core Web Framework
+# ---------------------------------------------------------------------------
+
+# Sinatra - Lightweight web framework for the C2 simulation endpoints
+# Used for: HTTP routes (register, heartbeat, exfil, command, API)
+gem 'sinatra', '~> 4.0'
+
+# Sinatra contrib - Extensions including JSON helpers and namespace support
+gem 'sinatra-contrib', '~> 4.0'
+
+# Puma - Production-grade web server
+# Used for: Serving the simulation with proper concurrency handling
+gem 'puma', '~> 6.4'
+
+# ---------------------------------------------------------------------------
+# Data & Serialization
+# ---------------------------------------------------------------------------
+
+# JSON - Fast JSON parsing and generation
+# Used for: All request/response serialization between agents and server
+gem 'json', '~> 2.7'
+
+# SQLite3 - Lightweight embedded database
+# Used for: Persisting simulation data (agents, exfil records, commands)
+gem 'sqlite3', '~> 2.0'
+
+# ---------------------------------------------------------------------------
+# Configuration & Utilities
+# ---------------------------------------------------------------------------
+
+# Rack protection - Security middleware (even simulations need good hygiene)
+gem 'rack-protection', '~> 4.0'
+
+# ---------------------------------------------------------------------------
+# Development & Testing
+# ---------------------------------------------------------------------------
+group :development do
+  # Rerun - Auto-restart server on file changes during development
+  gem 'rerun', '~> 0.14'
+
+  # Rubocop - Linting and style enforcement
+  gem 'rubocop', '~> 1.62', require: false
+end
+
+group :test do
+  # RSpec - Testing framework for simulation behavior verification
+  gem 'rspec', '~> 3.13'
+
+  # Rack::Test - HTTP testing utilities for Sinatra routes
+  gem 'rack-test', '~> 2.1'
+
+  # SimpleCov - Code coverage reporting
+  gem 'simplecov', '~> 0.22', require: false
+
+  # WebMock - HTTP request stubbing for isolated tests
+  gem 'webmock', '~> 3.23', require: false
+end

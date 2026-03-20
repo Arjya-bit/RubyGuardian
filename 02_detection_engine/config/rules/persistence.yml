@@ -1,0 +1,291 @@
+# RubyGuardian Detection Rule: Persistence Mechanism Installation
+# Detects techniques used to maintain access across reboots including
+# registry run keys, scheduled tasks, services, and startup folders.
+#
+# References:
+#   - MITRE ATT&CK TA0003 (Persistence)
+#   - https://attack.mitre.org/tactics/TA0003/
+
+---
+rules:
+  - id: PERS-001
+    name: Registry Run Key Modification
+    description: >
+      Detects creation or modification of registry Run/RunOnce keys which
+      are commonly used for persistence by malware to execute payloads
+      at user logon or system startup.
+    severity: high
+    status: enabled
+    tags:
+      - persistence
+      - registry
+      - autostart
+    mitre_attack:
+      tactics:
+        - Persistence
+        - Privilege Escalation
+      techniques:
+        - T1547.001
+    conditions:
+      and:
+        - field: event_type
+          op: in
+          value:
+            - registry_set
+            - registry_create
+        - field: registry_key
+          op: matches
+          value: >-
+            (HKLM|HKCU)\\Software\\Microsoft\\Windows\\CurrentVersion\\(Run|RunOnce|RunOnceEx|RunServices|RunServicesOnce|Policies\\Explorer\\Run)
+        - not:
+            - field: source_process.name
+              op: in
+              value:
+                - msiexec.exe
+                - setup.exe
+                - GoogleUpdate.exe
+                - MicrosoftEdgeUpdate.exe
+        - field: registry_value_data
+          op: not_exists
+          value: null
+    response:
+      alert: true
+      collect_registry_snapshot: true
+
+  - id: PERS-002
+    name: Scheduled Task Creation for Persistence
+    description: >
+      Detects creation of scheduled tasks via schtasks.exe, at.exe,
+      or COM objects that may be used for persistence or lateral movement.
+    severity: high
+    status: enabled
+    tags:
+      - persistence
+      - scheduled_task
+    mitre_attack:
+      tactics:
+        - Persistence
+        - Execution
+        - Privilege Escalation
+      techniques:
+        - T1053.005
+    conditions:
+      or:
+        - and:
+            - field: event_type
+              op: eq
+              value: process_create
+            - field: process_name
+              op: in
+              value:
+                - schtasks.exe
+                - at.exe
+            - field: command_line
+              op: contains
+              value: "/create"
+            - or:
+                - field: command_line
+                  op: matches
+                  value: "(ONLOGON|ONSTART|ONIDLE|MINUTE|HOURLY|DAILY)"
+                - field: command_line
+                  op: matches
+                  value: "(powershell|cmd|wscript|cscript|mshta|rundll32)"
+        - and:
+            - field: event_type
+              op: eq
+              value: task_registered
+            - field: task_action
+              op: matches
+              value: "(powershell|cmd|wscript|cscript|mshta|\\.exe|\\.bat|\\.ps1)"
+            - not:
+                - field: task_author
+                  op: in
+                  value:
+                    - Microsoft Corporation
+                    - Microsoft
+    response:
+      alert: true
+
+  - id: PERS-003
+    name: New Service Installation
+    description: >
+      Detects creation of new Windows services which may be used for
+      persistence or privilege escalation. Filters out common legitimate
+      service installers.
+    severity: medium
+    status: enabled
+    tags:
+      - persistence
+      - service_creation
+    mitre_attack:
+      tactics:
+        - Persistence
+        - Privilege Escalation
+      techniques:
+        - T1543.003
+    conditions:
+      and:
+        - field: event_type
+          op: in
+          value:
+            - service_install
+            - registry_set
+        - or:
+            - and:
+                - field: event_type
+                  op: eq
+                  value: service_install
+                - field: service_start_type
+                  op: in
+                  value:
+                    - auto
+                    - auto_delayed
+                    - boot
+            - and:
+                - field: event_type
+                  op: eq
+                  value: registry_set
+                - field: registry_key
+                  op: matches
+                  value: "HKLM\\\\SYSTEM\\\\.*ControlSet.*\\\\Services\\\\"
+                - field: registry_value_name
+                  op: in
+                  value:
+                    - ImagePath
+                    - ServiceDll
+        - not:
+            - field: service_image_path
+              op: matches
+              value: "^(C:\\\\Windows\\\\|C:\\\\Program Files)"
+    response:
+      alert: true
+
+  - id: PERS-004
+    name: Startup Folder Modification
+    description: >
+      Detects files being placed in user or system Startup folders for
+      automatic execution at logon.
+    severity: medium
+    status: enabled
+    tags:
+      - persistence
+      - startup_folder
+    mitre_attack:
+      tactics:
+        - Persistence
+      techniques:
+        - T1547.001
+    conditions:
+      and:
+        - field: event_type
+          op: in
+          value:
+            - file_create
+            - file_modify
+        - field: file_path
+          op: matches
+          value: "(Start Menu\\\\Programs\\\\Startup|ProgramData\\\\Microsoft\\\\Windows\\\\Start Menu\\\\Programs\\\\StartUp)"
+        - field: file_extension
+          op: in
+          value:
+            - .exe
+            - .dll
+            - .bat
+            - .cmd
+            - .vbs
+            - .js
+            - .ps1
+            - .lnk
+            - .scr
+        - not:
+            - field: source_process.name
+              op: in
+              value:
+                - explorer.exe
+                - msiexec.exe
+    response:
+      alert: true
+
+  - id: PERS-005
+    name: WMI Event Subscription Persistence
+    description: >
+      Detects WMI event subscriptions being created for persistence.
+      Attackers use WMI event consumers to execute code in response
+      to system events.
+    severity: high
+    status: enabled
+    tags:
+      - persistence
+      - wmi
+      - fileless
+    mitre_attack:
+      tactics:
+        - Persistence
+      techniques:
+        - T1546.003
+    conditions:
+      or:
+        - and:
+            - field: event_type
+              op: eq
+              value: wmi_event
+            - field: wmi_operation
+              op: in
+              value:
+                - EventConsumerCreation
+                - EventFilterCreation
+                - FilterToConsumerBinding
+        - and:
+            - field: event_type
+              op: eq
+              value: process_create
+            - field: command_line
+              op: matches
+              value: "(Register-WmiEvent|Set-WmiInstance|__EventFilter|__EventConsumer|CommandLineEventConsumer|ActiveScriptEventConsumer)"
+    response:
+      alert: true
+      collect_wmi_subscriptions: true
+
+  - id: PERS-006
+    name: DLL Search Order Hijacking Setup
+    description: >
+      Detects DLL files being placed in directories where they could
+      be loaded by legitimate applications through search order hijacking.
+    severity: medium
+    status: enabled
+    tags:
+      - persistence
+      - dll_hijacking
+      - defense_evasion
+    mitre_attack:
+      tactics:
+        - Persistence
+        - Privilege Escalation
+        - Defense Evasion
+      techniques:
+        - T1574.001
+    conditions:
+      and:
+        - field: event_type
+          op: eq
+          value: file_create
+        - field: file_extension
+          op: eq
+          value: .dll
+        - field: file_path
+          op: matches
+          value: "(C:\\\\Windows\\\\Temp|C:\\\\Users\\\\.*\\\\AppData|C:\\\\ProgramData)"
+        - not:
+            - field: source_process.name
+              op: in
+              value:
+                - msiexec.exe
+                - TrustedInstaller.exe
+                - svchost.exe
+                - setup.exe
+        - field: file_signed
+          op: neq
+          value: true
+    response:
+      alert: true
+      collect_file_sample: true

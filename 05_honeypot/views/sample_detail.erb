@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sample <%= @sample[:id] %> - RubyGuardian</title>
+  <style>
+    :root {
+      --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-card: #1c2128;
+      --text-primary: #c9d1d9; --text-secondary: #8b949e;
+      --accent-red: #f85149; --accent-orange: #d29922; --accent-green: #3fb950;
+      --accent-blue: #58a6ff; --accent-purple: #bc8cff; --border: #30363d;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, monospace; background: var(--bg-primary); color: var(--text-primary); }
+    .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 16px 24px; }
+    .header a { color: var(--accent-blue); text-decoration: none; font-size: 13px; }
+    .header h1 { font-size: 18px; margin-top: 8px; }
+    .header h1 .id { color: var(--accent-purple); font-family: monospace; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .meta-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .meta-card .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+    .meta-card .value { font-size: 18px; font-weight: bold; margin-top: 4px; }
+    .section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .section h2 { font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .risk-meter { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+    .risk-meter .fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+    .severity { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .severity.critical { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+    .severity.high { background: rgba(210, 153, 34, 0.2); color: var(--accent-orange); }
+    .severity.medium { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+    .severity.low { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+    .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); margin: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--text-secondary); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .timeline { list-style: none; position: relative; padding-left: 24px; }
+    .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .timeline li { position: relative; padding: 8px 0 16px 16px; }
+    .timeline li::before { content: ''; position: absolute; left: -20px; top: 12px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg-card); }
+    .timeline li.critical::before { border-color: var(--accent-red); background: var(--accent-red); }
+    .timeline li.high::before { border-color: var(--accent-orange); background: var(--accent-orange); }
+    .timeline li .time { font-size: 11px; color: var(--text-secondary); }
+    .timeline li .desc { margin-top: 2px; }
+    pre { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
+    .ioc-list { list-style: none; }
+    .ioc-list li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .ioc-list .type { font-size: 11px; background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; min-width: 60px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="/dashboard">&larr; Back to Dashboard</a>
+    <h1>Sample <span class="id"><%= @sample[:id] %></span></h1>
+  </div>
+
+  <div class="container">
+    <!-- Overview Cards -->
+    <div class="meta-grid">
+      <div class="meta-card">
+        <div class="label">Risk Score</div>
+        <div class="value" style="color: <%= @sample[:risk_score].to_i >= 70 ? 'var(--accent-red)' : @sample[:risk_score].to_i >= 40 ? 'var(--accent-orange)' : 'var(--accent-green)' %>;">
+          <%= @sample[:risk_score] || 0 %>/100
+        </div>
+        <div class="risk-meter">
+          <div class="fill" style="width: <%= @sample[:risk_score] || 0 %>%; background: <%= @sample[:risk_score].to_i >= 70 ? 'var(--accent-red)' : @sample[:risk_score].to_i >= 40 ? 'var(--accent-orange)' : 'var(--accent-green)' %>;"></div>
+        </div>
+      </div>
+      <div class="meta-card">
+        <div class="label">Threat Family</div>
+        <div class="value"><%= @sample[:family] || 'Unclassified' %></div>
+        <span class="severity <%= @sample[:severity] %>"><%= @sample[:severity] || 'unknown' %></span>
+      </div>
+      <div class="meta-card">
+        <div class="label">Analysis Duration</div>
+        <div class="value"><%= @sample[:duration_seconds] || 0 %>s</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+          <%= @sample[:total_events] || 0 %> events recorded
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample Metadata -->
+    <div class="section">
+      <h2>Sample Metadata</h2>
+      <table>
+        <tr><th style="width:180px;">SHA256</th><td style="font-family:monospace;"><%= @sample[:sha256] %></td></tr>
+        <tr><th>File Name</th><td><%= @sample[:filename] %></td></tr>
+        <tr><th>File Size</th><td><%= @sample[:filesize] %> bytes</td></tr>
+        <tr><th>Captured At</th><td><%= @sample[:captured_at] %></td></tr>
+        <tr><th>Analyzed At</th><td><%= @sample[:analyzed_at] %></td></tr>
+        <tr><th>Source IP</th><td><%= @sample[:source_ip] || 'N/A' %></td></tr>
+        <tr><th>Source</th><td><%= @sample[:source_service] || 'N/A' %></td></tr>
+        <tr><th>Tags</th>
+          <td><% (@sample[:tags] || []).each do |tag| %><span class="tag"><%= tag %></span><% end %></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Pattern Matches -->
+    <% if @sample[:matches] && !@sample[:matches].empty? %>
+    <div class="section">
+      <h2>Pattern Matches</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Family</th><th>Severity</th><th>Confidence</th><th>Description</th></tr></thead>
+        <tbody>
+          <% @sample[:matches].each do |match| %>
+          <tr>
+            <td><%= match[:rule_name] %></td>
+            <td><%= match[:family] %></td>
+            <td><span class="severity <%= match[:severity] %>"><%= match[:severity] %></span></td>
+            <td><%= match[:confidence] %>%</td>
+            <td><%= match[:description] %></td>
+          </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <% end %>
+
+    <!-- Behavioral Timeline -->
+    <div class="section">
+      <h2>Behavioral Timeline</h2>
+      <ul class="timeline">
+        <% (@sample[:timeline] || []).first(30).each do |event| %>
+        <li class="<%= event[:severity] %>">
+          <div class="time"><%= event[:elapsed_ms] %>ms - <span class="severity <%= event[:severity] %>"><%= event[:severity] %></span></div>
+          <div class="desc"><%= event[:description] %></div>
+        </li>
+        <% end %>
+      </ul>
+    </div>
+
+    <!-- IOCs Extracted -->
+    <% if @sample[:iocs] && !@sample[:iocs].empty? %>
+    <div class="section">
+      <h2>Indicators of Compromise</h2>
+      <ul class="ioc-list">
+        <% @sample[:iocs].each do |ioc| %>
+        <li>
+          <span class="type"><%= ioc[:type] %></span>
+          <span style="font-family: monospace; font-size: 13px;"><%= ioc[:value] %></span>
+        </li>
+        <% end %>
+      </ul>
+    </div>
+    <% end %>
+
+    <!-- Raw Captured Output -->
+    <div class="section">
+      <h2>Captured Output (stdout/stderr)</h2>
+      <pre><%= @sample[:captured_output] || '(no output captured)' %></pre>
+    </div>
+  </div>
+</body>
+</html>

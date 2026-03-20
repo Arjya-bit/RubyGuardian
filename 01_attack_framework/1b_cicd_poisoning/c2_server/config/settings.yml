@@ -1,0 +1,163 @@
+# =============================================================================
+# RubyGuardian - Simulated C2 Server Configuration
+# =============================================================================
+#
+# EDUCATIONAL DISCLAIMER:
+#   Configuration for the simulated C2 server used in CI/CD poisoning
+#   research. All values are tuned for safe, sandboxed simulation.
+#   No actual C2 operations are conducted.
+#
+# MITRE ATT&CK Context:
+#   Real C2 servers use configuration files to manage operational parameters
+#   such as communication intervals, encryption keys, and exfiltration
+#   channels. This config demonstrates those concepts safely.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Server Configuration
+# ---------------------------------------------------------------------------
+server:
+  # Bind address - localhost only for safety; override in Docker
+  host: "127.0.0.1"
+  port: 4567
+
+  # Maximum number of concurrent agent connections to track
+  max_agents: 100
+
+  # Request size limits to prevent abuse during simulation
+  max_request_body_bytes: 1048576  # 1 MB
+
+  # Enable verbose logging of all C2 interactions
+  verbose_logging: true
+
+# ---------------------------------------------------------------------------
+# Simulation Parameters
+# ---------------------------------------------------------------------------
+simulation:
+  # Mode: 'passive' (log only) or 'interactive' (allow command queuing)
+  # Both modes are simulation-only; no real commands are ever executed
+  mode: "passive"
+
+  # Auto-expire agents after this many seconds without heartbeat
+  agent_stale_threshold_seconds: 120
+  agent_disconnect_threshold_seconds: 600
+
+  # Maximum number of commands that can be queued per agent
+  max_queued_commands_per_agent: 50
+
+  # Automatically reset simulation state after this duration (seconds)
+  # Set to 0 to disable auto-reset
+  auto_reset_after_seconds: 0
+
+  # Tag all log entries with this prefix for easy filtering
+  log_prefix: "[C2-SIM]"
+
+# ---------------------------------------------------------------------------
+# Database Configuration
+# ---------------------------------------------------------------------------
+database:
+  # SQLite database path (relative to server root)
+  path: "db/c2_simulation.db"
+
+  # Enable WAL mode for better concurrent read performance
+  wal_mode: true
+
+  # Maximum database size in MB (safety limit)
+  max_size_mb: 256
+
+# ---------------------------------------------------------------------------
+# Agent Communication Settings
+# ---------------------------------------------------------------------------
+# These mirror real C2 communication parameters for educational purposes.
+# In actual attacks, these settings control how stealthy the C2 traffic is.
+agent:
+  # Recommended heartbeat interval in seconds (sent to agents at registration)
+  heartbeat_interval: 30
+
+  # Jitter range (percentage) to randomize heartbeat timing
+  # Real C2 uses jitter to avoid network detection patterns (T1071.001)
+  heartbeat_jitter_percent: 20
+
+  # Authentication token expiry in seconds
+  token_ttl_seconds: 3600
+
+  # Simulated encryption settings (for demonstrating T1573.001)
+  # NOTE: No actual encryption is applied in the simulation
+  encryption:
+    enabled: false
+    algorithm: "aes-256-gcm"
+    note: "Encryption simulation disabled - all traffic is plaintext for analysis"
+
+# ---------------------------------------------------------------------------
+# Exfiltration Settings
+# ---------------------------------------------------------------------------
+exfiltration:
+  # Maximum payload size accepted per exfil request (bytes)
+  max_payload_size: 5242880  # 5 MB
+
+  # Data types to track (for filtering and statistics)
+  tracked_data_types:
+    - env_vars
+    - ssh_keys
+    - api_tokens
+    - cloud_credentials
+    - source_code
+    - build_artifacts
+    - docker_config
+    - kubeconfig
+    - npm_tokens
+    - gem_credentials
+
+  # Severity mappings for different data types
+  severity_map:
+    cloud_credentials: "critical"
+    ssh_keys: "critical"
+    kubeconfig: "critical"
+    api_tokens: "high"
+    gem_credentials: "high"
+    npm_tokens: "high"
+    docker_config: "high"
+    env_vars: "medium"
+    source_code: "medium"
+    build_artifacts: "low"
+
+# ---------------------------------------------------------------------------
+# Logging Configuration
+# ---------------------------------------------------------------------------
+logging:
+  # Log level: DEBUG, INFO, WARN, ERROR, FATAL
+  level: "INFO"
+
+  # Log output directory (relative to server root)
+  directory: "logs"
+
+  # Log rotation: 'daily', 'weekly', 'monthly', or size in bytes
+  rotation: "daily"
+
+  # Maximum number of old log files to retain
+  max_files: 30
+
+  # Include request bodies in logs (useful for analysis, disable in production)
+  log_request_bodies: false
+
+# ---------------------------------------------------------------------------
+# MITRE ATT&CK Mapping
+# ---------------------------------------------------------------------------
+# Reference mapping for techniques demonstrated by this simulation
+mitre_attack:
+  techniques:
+    - id: "T1195.002"
+      name: "Supply Chain Compromise: Compromise Software Supply Chain"
+      phase: "Initial Access"
+    - id: "T1071.001"
+      name: "Application Layer Protocol: Web Protocols"
+      phase: "Command and Control"
+    - id: "T1041"
+      name: "Exfiltration Over C2 Channel"
+      phase: "Exfiltration"
+    - id: "T1059.004"
+      name: "Command and Scripting Interpreter: Unix Shell"
+      phase: "Execution"
+    - id: "T1573.001"
+      name: "Encrypted Channel: Symmetric Cryptography"
+      phase: "Command and Control"

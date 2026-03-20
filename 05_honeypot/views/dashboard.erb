@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RubyGuardian Honeypot Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-card: #1c2128;
+      --text-primary: #c9d1d9;
+      --text-secondary: #8b949e;
+      --accent-red: #f85149;
+      --accent-orange: #d29922;
+      --accent-green: #3fb950;
+      --accent-blue: #58a6ff;
+      --accent-purple: #bc8cff;
+      --border: #30363d;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; background: var(--bg-primary); color: var(--text-primary); }
+    .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 20px; color: var(--accent-red); }
+    .header .status { font-size: 13px; color: var(--accent-green); }
+    .header .status::before { content: '●'; margin-right: 6px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .stat-card .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-card .value { font-size: 32px; font-weight: bold; margin-top: 4px; }
+    .stat-card .change { font-size: 12px; margin-top: 4px; }
+    .stat-card .change.up { color: var(--accent-red); }
+    .stat-card .change.down { color: var(--accent-green); }
+    .panels { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .panel h2 { font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--text-secondary); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    tr:hover { background: rgba(88, 166, 255, 0.05); }
+    .severity { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .severity.critical { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+    .severity.high { background: rgba(210, 153, 34, 0.2); color: var(--accent-orange); }
+    .severity.medium { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+    .severity.low { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+    .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); margin-right: 4px; }
+    .threat-list { list-style: none; }
+    .threat-list li { padding: 10px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .threat-list .family-name { font-weight: 600; }
+    .threat-list .count { background: var(--bg-secondary); padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+    .footer { text-align: center; padding: 24px; color: var(--text-secondary); font-size: 12px; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>RubyGuardian Honeypot</h1>
+    <span class="status">Monitoring Active &mdash; <%= Time.now.utc.strftime('%Y-%m-%d %H:%M UTC') %></span>
+  </div>
+
+  <div class="container">
+    <!-- Summary Statistics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total Events (24h)</div>
+        <div class="value" style="color: var(--accent-blue);"><%= @stats[:total_events] || 0 %></div>
+        <div class="change <%= @stats[:events_trend] == :increasing ? 'up' : 'down' %>">
+          <%= @stats[:events_change_pct] || 0 %>% vs yesterday
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Malicious Samples</div>
+        <div class="value" style="color: var(--accent-red);"><%= @stats[:malicious_samples] || 0 %></div>
+        <div class="change">of <%= @stats[:total_samples] || 0 %> analyzed</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Unique Source IPs</div>
+        <div class="value" style="color: var(--accent-orange);"><%= @stats[:unique_ips] || 0 %></div>
+        <div class="change"><%= @stats[:countries_count] || 0 %> countries</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Active Threat Families</div>
+        <div class="value" style="color: var(--accent-purple);"><%= @stats[:threat_families_count] || 0 %></div>
+        <div class="change"><%= @stats[:new_families] || 0 %> new today</div>
+      </div>
+    </div>
+
+    <!-- Recent Captures & Threat Families -->
+    <div class="panels">
+      <div class="panel">
+        <h2>Recent Captures</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Sample ID</th>
+              <th>Severity</th>
+              <th>Family</th>
+              <th>Tags</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (@recent_captures || []).first(15).each do |capture| %>
+            <tr>
+              <td><%= capture[:timestamp] %></td>
+              <td><a href="/samples/<%= capture[:sample_id] %>" style="color: var(--accent-blue); text-decoration: none;"><%= capture[:sample_id][0..12] %></a></td>
+              <td><span class="severity <%= capture[:severity] %>"><%= capture[:severity] %></span></td>
+              <td><%= capture[:family] || 'Unknown' %></td>
+              <td>
+                <% (capture[:tags] || []).first(3).each do |tag| %>
+                  <span class="tag"><%= tag %></span>
+                <% end %>
+              </td>
+              <td><%= capture[:risk_score] || 0 %></td>
+            </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Threat Families (24h)</h2>
+        <ul class="threat-list">
+          <% (@threat_families || []).each do |family, count| %>
+          <li>
+            <span class="family-name"><%= family %></span>
+            <span class="count"><%= count %></span>
+          </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Honeypot Services & IOCs -->
+    <div class="panels">
+      <div class="panel">
+        <h2>Honeypot Services</h2>
+        <table>
+          <thead>
+            <tr><th>Service</th><th>Status</th><th>Events</th><th>Last Activity</th></tr>
+          </thead>
+          <tbody>
+            <% (@services || []).each do |svc| %>
+            <tr>
+              <td><%= svc[:name] %></td>
+              <td><span style="color: <%= svc[:status] == 'active' ? 'var(--accent-green)' : 'var(--accent-red)' %>;">● <%= svc[:status] %></span></td>
+              <td><%= svc[:events] %></td>
+              <td><%= svc[:last_activity] %></td>
+            </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Top IOCs</h2>
+        <table>
+          <thead><tr><th>Type</th><th>Value</th><th>Hits</th></tr></thead>
+          <tbody>
+            <% (@top_iocs || []).first(10).each do |ioc| %>
+            <tr>
+              <td><span class="tag"><%= ioc[:type] %></span></td>
+              <td style="font-family: monospace; font-size: 12px;"><%= ioc[:value] %></td>
+              <td><%= ioc[:count] %></td>
+            </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    RubyGuardian Honeypot v1.0.0 &mdash; Report generated at <%= Time.now.utc.iso8601 %>
+  </div>
+</body>
+</html>
